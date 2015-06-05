@@ -1,0 +1,64 @@
+Bill of Material for Sheet1.Bom
+
+Used Part Type          Designator Footprint
+==== ================== ========== ============
+24   0.1uF              C1 C2 C3   0805
+                        C4 C5 C6
+                        C7 C8 C9
+                        C10 C11
+                        C12 C13
+                        C14 C15
+                        C16 C17
+                        C18 C19
+                        C30 C31
+                        C32 C33
+                        C34
+1    1.0uF              C27        0805
+8    1K0                R22 R23    0805
+                        R24 R25
+                        R26 R27
+                        R28 R29
+18   1K5                R5 R6 R7   0805
+                        R8 R9 R10
+                        R11 R12
+                        R13 R14
+                        R15 R16
+                        R17 R18
+                        R19 R20
+                        R101 R102
+1    2K2                R32        0805
+1    2K7                R31        0805
+5    10K                R1 R2 R3   0805
+                        R4 R21
+1    10uF 35V           C22        1206
+1    10uF 35V           C26        CAP-D
+2    10uF               C25 C101   1206
+1    11.0592MHz         Y1         XTAL1
+1    13K                R30        0805
+2    18pF               C23 C24    0805
+1    100uH 1.7A         L2         MS125
+1    220uF 16V          C28        CAP-D6.3
+2    330uF 35V          C20 C21    CAP-D10
+1    470uF 16V          C29        CAP-D8
+1    600M 100uH         L1         1206
+1    ATMEGA640          U3         MEGA640
+2    CD4009UBM          U1 U2      SO16
+9    CON2               J1 J2 J3   PW
+                        J4 J5 J6
+                        J7 J8 J16
+1    CON2               J9         SIP2
+1    CON3               J17        SIP3
+6    CON8               J10 J11    MOTOR_DRIVER
+                        J12 J13
+                        J14 J15
+7    LED                D2 D3 D4   SIP2
+                        D5 D6 D7
+                        D8
+1    LT1076             U7         DD7
+1    MAX3232            U12        SO16
+1    MBRD360            D1         DPAK
+2    SIO-0              PJ1 PJ2    232P
+1    SN74HC14D          U6         SO14
+4    SN74HC244          U8 U9 U10  SO20
+                        U11
+2    SN74LV8154         U4 U5      TSSOP20      

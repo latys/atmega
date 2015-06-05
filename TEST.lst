@@ -1,0 +1,1275 @@
+Interrupt Vectors
+    00000 940C 00E4 JMP	__start|__text_start
+    00020 940C 0107 JMP	_timer1CAP_isr
+    00032 940C 01E7 JMP	_uart0_isr
+    0003E 940C 0158 JMP	_timer3CAP_isr
+    00048 940C 01E8 JMP	_uart1_isr
+    00052 940C 0185 JMP	_timer4CAP_isr
+    0005C 940C 01BA JMP	_timer5CAP_isr
+
+Program Code (text area)
+__start|__text_start:
+    000E4 EFCF      LDI	R28,0xFF
+    000E5 E2D1      LDI	R29,0x21
+    000E6 BFCD      OUT	0x3D,R28
+    000E7 BFDE      OUT	0x3E,R29
+    000E8 51CE      SUBI	R28,0x1E
+    000E9 40D0      SBCI	R29,0
+    000EA EA0A      LDI	R16,0xAA
+    000EB 8308      ST	Y,R16
+    000EC 2400      CLR	R0
+    000ED E0E0      LDI	R30,0
+    000EE E0F2      LDI	R31,2
+    000EF E012      LDI	R17,2
+    000F0 33E2      CPI	R30,0x32
+    000F1 07F1      CPC	R31,R17
+    000F2 F011      BEQ	0x00F5
+    000F3 9201      ST	Z+,R0
+    000F4 CFFB      RJMP	0x00F0
+    000F5 8300      ST	Z,R16
+    000F6 ECE8      LDI	R30,0xC8
+    000F7 E0F1      LDI	R31,1
+    000F8 E0A0      LDI	R26,0
+    000F9 E0B2      LDI	R27,2
+    000FA E011      LDI	R17,1
+    000FB E000      LDI	R16,0
+    000FC BF0B      OUT	0x3B,R16
+    000FD 3CE8      CPI	R30,0xC8
+    000FE 07F1      CPC	R31,R17
+    000FF F021      BEQ	0x0104
+    00100 95C8      LPM
+    00101 9631      ADIW	R30,1
+    00102 920D      ST	X+,R0
+    00103 CFF9      RJMP	0x00FD
+    00104 940E 0436 CALL	_main
+_exit:
+    00106 CFFF      RJMP	_exit
+_timer1CAP_isr:
+    00107 920A      ST	-Y,R0
+    00108 921A      ST	-Y,R1
+    00109 922A      ST	-Y,R2
+    0010A 923A      ST	-Y,R3
+    0010B 924A      ST	-Y,R4
+    0010C 925A      ST	-Y,R5
+    0010D 930A      ST	-Y,R16
+    0010E 931A      ST	-Y,R17
+    0010F 932A      ST	-Y,R18
+    00110 933A      ST	-Y,R19
+    00111 938A      ST	-Y,R24
+    00112 939A      ST	-Y,R25
+    00113 93AA      ST	-Y,R26
+    00114 93BA      ST	-Y,R27
+    00115 B60F      IN	R0,0x3F
+    00116 920A      ST	-Y,R0
+FILE: E:\工作\atmage640\motor.c
+(0001) # include <iom640v.h>
+(0002) # include <AVRdef.h>
+(0003) 
+(0004) /**************************引脚说明**************************************************************************************************
+(0005) motor1:
+(0006) 	  oc1A->pwm
+(0007) 	  PORTL:2->enable
+(0008) 	  PortL:3->方向
+(0009) 	  ICP1->霍尔元件脉冲检测
+(0010) motor2:
+(0011) 	  oc1B->pwm
+(0012) 	  PORTL:4->enable
+(0013) 	  PortL:5->方向
+(0014) 	  ICP3->霍尔元件脉冲检测
+(0015) motor3:
+(0016) 	  oc3A->pwm
+(0017) 	  PORTL:6->enable
+(0018) 	  PortL:7->方向
+(0019) 	  ICP4->霍尔元件脉冲检测
+(0020) motor4:
+(0021) 	  oc3B->pwm
+(0022) 	  PORTD:0->enable
+(0023) 	  PortD:1->方向
+(0024) 	  ICP5->霍尔元件脉冲检测
+(0025) motor5:
+(0026) 	  oc4A->pwm
+(0027) 	  PORTD:6->enable
+(0028) 	  PortD:7->方向
+(0029) 	  外部芯片->霍尔元件脉冲检测
+(0030) motor6:
+(0031) 	  oc4B->pwm
+(0032) 	  PORTB:3->enable
+(0033) 	  PortB:4->方向
+(0034) 	  外部芯片->霍尔元件脉冲检测
+(0035) 	  
+(0036) 	  
+(0037) 	  
+(0038) 	  
+(0039) LED:
+(0040) 	PB:0,1,2
+(0041) 	PH:5,6
+(0042) 	PE:6
+(0043) 	
+(0044) 	
+(0045) 	
+(0046) 限位检测：
+(0047) 
+(0048) 	PK:0,1
+(0049) 	   2,3
+(0050) 	   4,5
+(0051) 	   6,7
+(0052) 	
+(0053) 
+(0054) 
+(0055) 
+(0056) ***************************************************************************************************************************************/
+(0057) 
+(0058) #define PULSE_WIDTH 0xff
+(0059) 
+(0060) #define MOTOR_FORWARD 0X01                                 //方向向前
+(0061) #define MOTOR_BACKWARD 0X00								//方向后退
+(0062) 
+(0063) 
+(0064) 
+(0065) #define FOSC 11059200// Clock Speed
+(0066) #define BAUD 9600
+(0067) #define MYUBRR (FOSC/16/BAUD-1)
+(0068) 
+(0069) 
+(0070) 
+(0071) 
+(0072) /************************************************中断函数声明***********************************************************************/
+(0073) 
+(0074) #pragma interrupt_handler uart0_isr:26                         //uart0接收中断26
+(0075) #pragma interrupt_handler uart1_isr:37                         //uart0接收中断37
+(0076) 
+(0077) #pragma interrupt_handler timer1CAP_isr:17                     //定时器1脉冲检测中断
+(0078) #pragma interrupt_handler timer3CAP_isr:32                     //定时器3脉冲检测中断
+(0079) #pragma interrupt_handler timer4CAP_isr:42                     //定时器4脉冲检测中断
+(0080) #pragma interrupt_handler timer5CAP_isr:47                     //定时器5脉冲检测中断
+(0081) 
+(0082) /***********************************************************************************************************************************/
+(0083) long Position1;
+(0084) int Direct1;
+(0085) 
+(0086) long Position2;
+(0087) int Direct2;
+(0088) 
+(0089) long Position3;
+(0090) int Direct3;
+(0091) 
+(0092) long Position4;
+(0093) int Direct4;
+(0094) 
+(0095) long Position5;
+(0096) int Direct5;
+(0097) 
+(0098) long motor1Step;
+(0099) long motor2Step;
+(0100) long motor3Step;
+(0101) long motor4Step;
+(0102) long motor5Step;
+(0103) 
+(0104) 
+(0105) 
+(0106) 
+(0107) 
+(0108) 
+(0109) 
+(0110) /*****************************************中断函数**********************************************************************************/
+(0111) void timer1CAP_isr()
+(0112) {
+(0113) 	motor1Step++;
+    00117 E081      LDI	R24,1
+    00118 E090      LDI	R25,0
+    00119 E0A0      LDI	R26,0
+    0011A E0B0      LDI	R27,0
+    0011B 9040 0212 LDS	R4,motor1Step+2
+    0011D 9050 0213 LDS	R5,motor1Step+3
+    0011F 9020 0210 LDS	R2,motor1Step
+    00121 9030 0211 LDS	R3,motor1Step+1
+    00123 0E28      ADD	R2,R24
+    00124 1E39      ADC	R3,R25
+    00125 1E4A      ADC	R4,R26
+    00126 1E5B      ADC	R5,R27
+    00127 9230 0211 STS	motor1Step+1,R3
+    00129 9220 0210 STS	motor1Step,R2
+    0012B 9250 0213 STS	motor1Step+3,R5
+    0012D 9240 0212 STS	motor1Step+2,R4
+(0114) 	motor2Step++;
+    0012F E081      LDI	R24,1
+    00130 E090      LDI	R25,0
+    00131 E0A0      LDI	R26,0
+    00132 E0B0      LDI	R27,0
+    00133 9040 020E LDS	R4,motor2Step+2
+    00135 9050 020F LDS	R5,motor2Step+3
+    00137 9020 020C LDS	R2,motor2Step
+    00139 9030 020D LDS	R3,motor2Step+1
+    0013B 0E28      ADD	R2,R24
+    0013C 1E39      ADC	R3,R25
+    0013D 1E4A      ADC	R4,R26
+    0013E 1E5B      ADC	R5,R27
+    0013F 9230 020D STS	motor2Step+1,R3
+    00141 9220 020C STS	motor2Step,R2
+    00143 9250 020F STS	motor2Step+3,R5
+    00145 9240 020E STS	motor2Step+2,R4
+    00147 9009      LD	R0,Y+
+    00148 BE0F      OUT	0x3F,R0
+    00149 91B9      LD	R27,Y+
+    0014A 91A9      LD	R26,Y+
+    0014B 9199      LD	R25,Y+
+    0014C 9189      LD	R24,Y+
+    0014D 9139      LD	R19,Y+
+    0014E 9129      LD	R18,Y+
+    0014F 9119      LD	R17,Y+
+    00150 9109      LD	R16,Y+
+    00151 9059      LD	R5,Y+
+    00152 9049      LD	R4,Y+
+    00153 9039      LD	R3,Y+
+    00154 9029      LD	R2,Y+
+    00155 9019      LD	R1,Y+
+    00156 9009      LD	R0,Y+
+    00157 9518      RETI
+_timer3CAP_isr:
+    00158 922A      ST	-Y,R2
+    00159 923A      ST	-Y,R3
+    0015A 924A      ST	-Y,R4
+    0015B 925A      ST	-Y,R5
+    0015C 938A      ST	-Y,R24
+    0015D 939A      ST	-Y,R25
+    0015E 93AA      ST	-Y,R26
+    0015F 93BA      ST	-Y,R27
+    00160 B62F      IN	R2,0x3F
+    00161 922A      ST	-Y,R2
+(0115) 
+(0116) }
+(0117) 
+(0118) void timer3CAP_isr()
+(0119) {
+(0120) 	motor3Step++;
+    00162 E081      LDI	R24,1
+    00163 E090      LDI	R25,0
+    00164 E0A0      LDI	R26,0
+    00165 E0B0      LDI	R27,0
+    00166 9040 020A LDS	R4,motor3Step+2
+    00168 9050 020B LDS	R5,motor3Step+3
+    0016A 9020 0208 LDS	R2,motor3Step
+    0016C 9030 0209 LDS	R3,motor3Step+1
+    0016E 0E28      ADD	R2,R24
+    0016F 1E39      ADC	R3,R25
+    00170 1E4A      ADC	R4,R26
+    00171 1E5B      ADC	R5,R27
+    00172 9230 0209 STS	motor3Step+1,R3
+    00174 9220 0208 STS	motor3Step,R2
+    00176 9250 020B STS	motor3Step+3,R5
+    00178 9240 020A STS	motor3Step+2,R4
+    0017A 9029      LD	R2,Y+
+    0017B BE2F      OUT	0x3F,R2
+    0017C 91B9      LD	R27,Y+
+    0017D 91A9      LD	R26,Y+
+    0017E 9199      LD	R25,Y+
+    0017F 9189      LD	R24,Y+
+    00180 9059      LD	R5,Y+
+    00181 9049      LD	R4,Y+
+    00182 9039      LD	R3,Y+
+    00183 9029      LD	R2,Y+
+    00184 9518      RETI
+_timer4CAP_isr:
+    00185 922A      ST	-Y,R2
+    00186 923A      ST	-Y,R3
+    00187 924A      ST	-Y,R4
+    00188 925A      ST	-Y,R5
+    00189 930A      ST	-Y,R16
+    0018A 931A      ST	-Y,R17
+    0018B 932A      ST	-Y,R18
+    0018C 933A      ST	-Y,R19
+    0018D 938A      ST	-Y,R24
+    0018E 939A      ST	-Y,R25
+    0018F 93AA      ST	-Y,R26
+    00190 93BA      ST	-Y,R27
+    00191 B62F      IN	R2,0x3F
+    00192 922A      ST	-Y,R2
+(0121) 
+(0122) }
+(0123) 
+(0124) void timer4CAP_isr()
+(0125) {
+(0126) 	motor4Step++;
+    00193 E081      LDI	R24,1
+    00194 E090      LDI	R25,0
+    00195 E0A0      LDI	R26,0
+    00196 E0B0      LDI	R27,0
+    00197 9040 0206 LDS	R4,motor4Step+2
+    00199 9050 0207 LDS	R5,motor4Step+3
+    0019B 9020 0204 LDS	R2,motor4Step
+    0019D 9030 0205 LDS	R3,motor4Step+1
+    0019F 0E28      ADD	R2,R24
+    001A0 1E39      ADC	R3,R25
+    001A1 1E4A      ADC	R4,R26
+    001A2 1E5B      ADC	R5,R27
+    001A3 9230 0205 STS	motor4Step+1,R3
+    001A5 9220 0204 STS	motor4Step,R2
+    001A7 9250 0207 STS	motor4Step+3,R5
+    001A9 9240 0206 STS	motor4Step+2,R4
+    001AB 9029      LD	R2,Y+
+    001AC BE2F      OUT	0x3F,R2
+    001AD 91B9      LD	R27,Y+
+    001AE 91A9      LD	R26,Y+
+    001AF 9199      LD	R25,Y+
+    001B0 9189      LD	R24,Y+
+    001B1 9139      LD	R19,Y+
+    001B2 9129      LD	R18,Y+
+    001B3 9119      LD	R17,Y+
+    001B4 9109      LD	R16,Y+
+    001B5 9059      LD	R5,Y+
+    001B6 9049      LD	R4,Y+
+    001B7 9039      LD	R3,Y+
+    001B8 9029      LD	R2,Y+
+    001B9 9518      RETI
+_timer5CAP_isr:
+    001BA 922A      ST	-Y,R2
+    001BB 923A      ST	-Y,R3
+    001BC 924A      ST	-Y,R4
+    001BD 925A      ST	-Y,R5
+    001BE 938A      ST	-Y,R24
+    001BF 939A      ST	-Y,R25
+    001C0 93AA      ST	-Y,R26
+    001C1 93BA      ST	-Y,R27
+    001C2 B62F      IN	R2,0x3F
+    001C3 922A      ST	-Y,R2
+(0127) 
+(0128) }
+(0129) void timer5CAP_isr()
+(0130) {
+(0131) 	motor5Step++;
+    001C4 E081      LDI	R24,1
+    001C5 E090      LDI	R25,0
+    001C6 E0A0      LDI	R26,0
+    001C7 E0B0      LDI	R27,0
+    001C8 9040 0202 LDS	R4,motor5Step+2
+    001CA 9050 0203 LDS	R5,motor5Step+3
+    001CC 9020 0200 LDS	R2,motor5Step
+    001CE 9030 0201 LDS	R3,motor5Step+1
+    001D0 0E28      ADD	R2,R24
+    001D1 1E39      ADC	R3,R25
+    001D2 1E4A      ADC	R4,R26
+    001D3 1E5B      ADC	R5,R27
+    001D4 9230 0201 STS	motor5Step+1,R3
+    001D6 9220 0200 STS	motor5Step,R2
+    001D8 9250 0203 STS	motor5Step+3,R5
+    001DA 9240 0202 STS	motor5Step+2,R4
+    001DC 9029      LD	R2,Y+
+    001DD BE2F      OUT	0x3F,R2
+    001DE 91B9      LD	R27,Y+
+    001DF 91A9      LD	R26,Y+
+    001E0 9199      LD	R25,Y+
+    001E1 9189      LD	R24,Y+
+    001E2 9059      LD	R5,Y+
+    001E3 9049      LD	R4,Y+
+    001E4 9039      LD	R3,Y+
+    001E5 9029      LD	R2,Y+
+    001E6 9518      RETI
+(0132) 
+(0133) }
+(0134) 
+(0135) uart0_isr()
+(0136) {
+_uart0_isr:
+    001E7 9518      RETI
+(0137) 
+(0138) }
+(0139) 
+(0140) uart1_isr()
+(0141) {
+_uart1_isr:
+    001E8 9518      RETI
+(0142) 
+(0143) 
+(0144) }
+(0145) /************************************************************************************************************************************/
+(0146) void USART0_Init( unsigned int ubrr){
+(0147) 	/* Set baud rate */
+(0148) 	UBRR0H = (unsigned char)(ubrr>>8);
+_USART0_Init:
+  ubrr                 --> R16
+    001E9 0118      MOVW	R2,R16
+    001EA 2C23      MOV	R2,R3
+    001EB 2433      CLR	R3
+    001EC 9220 00C5 STS	0xC5,R2
+(0149) 	UBRR0L = (unsigned char)ubrr;
+    001EE 9300 00C4 STS	0xC4,R16
+(0150) 	/* Enable receiver and transmitter */
+(0151) 	UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<<7);  //允许中断
+    001F0 E988      LDI	R24,0x98
+    001F1 9380 00C1 STS	0xC1,R24
+(0152) 	/* Set frame format: 8data, 1stop bit */
+(0153) 	UCSR0C = 0x06;
+    001F3 E086      LDI	R24,6
+    001F4 9380 00C2 STS	0xC2,R24
+    001F6 9508      RET
+(0154) } // USART_Init
+(0155) 
+(0156) void USART0_Transmit( unsigned char data )
+(0157) {
+(0158) 	/* Wait for empty transmit buffer */
+(0159) 	while ( !( UCSR0A & (1<<UDRE0)) )
+_USART0_Transmit:
+  data                 --> R16
+    001F7 9020 00C0 LDS	R2,0xC0
+    001F9 FE25      SBRS	R2,5
+    001FA CFFC      RJMP	_USART0_Transmit
+(0160) 	;
+(0161) 	/* Put data into buffer, sends the data */
+(0162) 	UDR0 = data;
+    001FB 9300 00C6 STS	0xC6,R16
+    001FD 9508      RET
+(0163) }
+(0164) 
+(0165) void USART1_Init( unsigned int ubrr){
+(0166) 	/* Set baud rate */
+(0167) 	UBRR1H = (unsigned char)(ubrr>>8);
+_USART1_Init:
+  ubrr                 --> R16
+    001FE 0118      MOVW	R2,R16
+    001FF 2C23      MOV	R2,R3
+    00200 2433      CLR	R3
+    00201 9220 00CD STS	0xCD,R2
+(0168) 	UBRR1L = (unsigned char)ubrr;
+    00203 9300 00CC STS	0xCC,R16
+(0169) 	/* Enable receiver and transmitter */
+(0170) 	UCSR1B = (1<<RXEN1)|(1<<TXEN1)|(1<<7);  //允许中断
+    00205 E988      LDI	R24,0x98
+    00206 9380 00C9 STS	0xC9,R24
+(0171) 	/* Set frame format: 8data, 1stop bit */
+(0172) 	UCSR1C = 0x06;
+    00208 E086      LDI	R24,6
+    00209 9380 00CA STS	0xCA,R24
+    0020B 9508      RET
+(0173) } // USART_Init
+(0174) 
+(0175) void USART1_Transmit( unsigned char data )
+(0176) {
+(0177) 	/* Wait for empty transmit buffer */
+(0178) 	while ( !( UCSR1A & (1<<UDRE1)) )
+_USART1_Transmit:
+  data                 --> R16
+    0020C 9020 00C8 LDS	R2,0xC8
+    0020E FE25      SBRS	R2,5
+    0020F CFFC      RJMP	_USART1_Transmit
+(0179) 	;
+(0180) 	/* Put data into buffer, sends the data */
+(0181) 	UDR1 = data;
+    00210 9300 00CE STS	0xCE,R16
+    00212 9508      RET
+(0182) }
+(0183) 
+(0184) 
+(0185) /***************************************motor1********************************************************************/
+(0186) void motor1_start(int direct){
+(0187) 	
+(0188) 	OCR1A = PULSE_WIDTH;
+_motor1_start:
+  direct               --> R16
+    00213 EF8F      LDI	R24,0xFF
+    00214 E090      LDI	R25,0
+    00215 9390 0089 STS	0x89,R25
+    00217 9380 0088 STS	0x88,R24
+(0189) 	DDRL |=(1<<4)|(1<<5) ;
+    00219 9180 010A LDS	R24,0x10A
+    0021B 6380      ORI	R24,0x30
+    0021C 9380 010A STS	0x10A,R24
+(0190) 	
+(0191) 	
+(0192) 	PORTL |=(1<<4);     //enable
+    0021E 9180 010B LDS	R24,0x10B
+    00220 6180      ORI	R24,0x10
+    00221 9380 010B STS	0x10B,R24
+(0193) 	//设置方向
+(0194) 	if(direct==0)
+    00223 3000      CPI	R16,0
+    00224 0701      CPC	R16,R17
+    00225 F431      BNE	0x022C
+(0195) 		PORTL &=(0xff<<5);
+    00226 9180 010B LDS	R24,0x10B
+    00228 7E80      ANDI	R24,0xE0
+    00229 9380 010B STS	0x10B,R24
+    0022B C009      RJMP	0x0235
+(0196) 	else if(direct==1)
+    0022C 3001      CPI	R16,1
+    0022D E0E0      LDI	R30,0
+    0022E 071E      CPC	R17,R30
+    0022F F429      BNE	0x0235
+(0197) 		PORTL |=(1<<5);
+    00230 9180 010B LDS	R24,0x10B
+    00232 6280      ORI	R24,0x20
+    00233 9380 010B STS	0x10B,R24
+    00235 9508      RET
+(0198) 
+(0199) 	
+(0200) }
+(0201) 
+(0202) void motor1_stop()
+(0203) {
+(0204) 	PORTL &=(0xff<<4);     //enable
+_motor1_stop:
+    00236 9180 010B LDS	R24,0x10B
+    00238 7F80      ANDI	R24,0xF0
+    00239 9380 010B STS	0x10B,R24
+    0023B 9508      RET
+(0205) 
+(0206) }
+(0207) 
+(0208) void motor1_slow()
+(0209) {
+(0210) 	OCR1B = PULSE_WIDTH/2;	//Load Pulse width
+_motor1_slow:
+    0023C E78F      LDI	R24,0x7F
+    0023D E090      LDI	R25,0
+    0023E 9390 008B STS	0x8B,R25
+    00240 9380 008A STS	0x8A,R24
+(0211) 	PORTL |=(1<<4);     //enable
+    00242 9180 010B LDS	R24,0x10B
+    00244 6180      ORI	R24,0x10
+    00245 9380 010B STS	0x10B,R24
+    00247 9508      RET
+(0212) 
+(0213) }
+(0214) 
+(0215) 
+(0216) /***************************************motor2********************************************************************/
+(0217) 
+(0218) 
+(0219) 
+(0220) 
+(0221) void motor2_start(int direct){
+(0222) 	
+(0223) 	OCR1B = PULSE_WIDTH;
+_motor2_start:
+  direct               --> R16
+    00248 EF8F      LDI	R24,0xFF
+    00249 E090      LDI	R25,0
+    0024A 9390 008B STS	0x8B,R25
+    0024C 9380 008A STS	0x8A,R24
+(0224) 	DDRL |=(1<<2)|(1<<3) ;
+    0024E 9180 010A LDS	R24,0x10A
+    00250 608C      ORI	R24,0xC
+    00251 9380 010A STS	0x10A,R24
+(0225) 	
+(0226) 	
+(0227) 	PORTL |=(1<<2);     //enable
+    00253 9180 010B LDS	R24,0x10B
+    00255 6084      ORI	R24,4
+    00256 9380 010B STS	0x10B,R24
+(0228) 	//设置方向
+(0229) 	if(direct==0)
+    00258 3000      CPI	R16,0
+    00259 0701      CPC	R16,R17
+    0025A F431      BNE	0x0261
+(0230) 		PORTL &=(0xff<<3);
+    0025B 9180 010B LDS	R24,0x10B
+    0025D 7F88      ANDI	R24,0xF8
+    0025E 9380 010B STS	0x10B,R24
+    00260 C009      RJMP	0x026A
+(0231) 	else if(direct==1)
+    00261 3001      CPI	R16,1
+    00262 E0E0      LDI	R30,0
+    00263 071E      CPC	R17,R30
+    00264 F429      BNE	0x026A
+(0232) 		PORTL |=(1<<3);
+    00265 9180 010B LDS	R24,0x10B
+    00267 6088      ORI	R24,0x8
+    00268 9380 010B STS	0x10B,R24
+    0026A 9508      RET
+(0233) 
+(0234) 	
+(0235) }
+(0236) 
+(0237) void motor2_stop()
+(0238) {
+(0239) 	PORTL &=(0xff<<2);     //enable
+_motor2_stop:
+    0026B 9180 010B LDS	R24,0x10B
+    0026D 7F8C      ANDI	R24,0xFC
+    0026E 9380 010B STS	0x10B,R24
+    00270 9508      RET
+(0240) 
+(0241) }
+(0242) 
+(0243) void motor2_slow()
+(0244) {
+(0245) 	OCR1A = PULSE_WIDTH/2;	//Load Pulse width
+_motor2_slow:
+    00271 E78F      LDI	R24,0x7F
+    00272 E090      LDI	R25,0
+    00273 9390 0089 STS	0x89,R25
+    00275 9380 0088 STS	0x88,R24
+(0246) 	PORTL |=(1<<2);     //enable
+    00277 9180 010B LDS	R24,0x10B
+    00279 6084      ORI	R24,4
+    0027A 9380 010B STS	0x10B,R24
+    0027C 9508      RET
+(0247) 
+(0248) }
+(0249) 
+(0250) /***************************************motor3********************************************************************/
+(0251) 
+(0252) 
+(0253) 
+(0254) 
+(0255) void motor3_start(int direct){
+(0256) 	
+(0257) 	OCR3A = PULSE_WIDTH;
+_motor3_start:
+  direct               --> R16
+    0027D EF8F      LDI	R24,0xFF
+    0027E E090      LDI	R25,0
+    0027F 9390 0099 STS	0x99,R25
+    00281 9380 0098 STS	0x98,R24
+(0258) 	DDRL |=(1<<6)|(1<<7) ;
+    00283 9180 010A LDS	R24,0x10A
+    00285 6C80      ORI	R24,0xC0
+    00286 9380 010A STS	0x10A,R24
+(0259) 	
+(0260) 	
+(0261) 	PORTL |=(1<<6);     //enable
+    00288 9180 010B LDS	R24,0x10B
+    0028A 6480      ORI	R24,0x40
+    0028B 9380 010B STS	0x10B,R24
+(0262) 	//设置方向
+(0263) 	if(direct==0)
+    0028D 3000      CPI	R16,0
+    0028E 0701      CPC	R16,R17
+    0028F F431      BNE	0x0296
+(0264) 		PORTL &=(0xff<<7);
+    00290 9180 010B LDS	R24,0x10B
+    00292 7880      ANDI	R24,0x80
+    00293 9380 010B STS	0x10B,R24
+    00295 C009      RJMP	0x029F
+(0265) 	else if(direct==1)
+    00296 3001      CPI	R16,1
+    00297 E0E0      LDI	R30,0
+    00298 071E      CPC	R17,R30
+    00299 F429      BNE	0x029F
+(0266) 		PORTL |=(1<<7);
+    0029A 9180 010B LDS	R24,0x10B
+    0029C 6880      ORI	R24,0x80
+    0029D 9380 010B STS	0x10B,R24
+    0029F 9508      RET
+(0267) 
+(0268) 	
+(0269) }
+(0270) 
+(0271) void motor3_stop()
+(0272) {
+(0273) 	PORTL &=(0xff<<6);     //enable
+_motor3_stop:
+    002A0 9180 010B LDS	R24,0x10B
+    002A2 7C80      ANDI	R24,0xC0
+    002A3 9380 010B STS	0x10B,R24
+    002A5 9508      RET
+(0274) 
+(0275) }
+(0276) 
+(0277) void motor3_slow()
+(0278) {
+(0279) 	OCR3A = PULSE_WIDTH/2;	//Load Pulse width
+_motor3_slow:
+    002A6 E78F      LDI	R24,0x7F
+    002A7 E090      LDI	R25,0
+    002A8 9390 0099 STS	0x99,R25
+    002AA 9380 0098 STS	0x98,R24
+(0280) 	PORTL |=(1<<6);     //enable
+    002AC 9180 010B LDS	R24,0x10B
+    002AE 6480      ORI	R24,0x40
+    002AF 9380 010B STS	0x10B,R24
+    002B1 9508      RET
+(0281) 
+(0282) }
+(0283) 
+(0284) 
+(0285) /***************************************motor4********************************************************************/
+(0286) 
+(0287) 
+(0288) 
+(0289) 
+(0290) void motor4_start(int direct){
+(0291) 	
+(0292) 	OCR3B = PULSE_WIDTH;
+_motor4_start:
+  direct               --> R16
+    002B2 EF8F      LDI	R24,0xFF
+    002B3 E090      LDI	R25,0
+    002B4 9390 009B STS	0x9B,R25
+    002B6 9380 009A STS	0x9A,R24
+(0293) 	DDRD |=(1<<0)|(1<<1) ;
+    002B8 B18A      IN	R24,0x0A
+    002B9 6083      ORI	R24,3
+    002BA B98A      OUT	0x0A,R24
+(0294) 	
+(0295) 	
+(0296) 	PORTD |=(1<<0);     //enable
+    002BB 9A58      SBI	0x0B,0
+(0297) 	//设置方向
+(0298) 	if(direct==0)
+    002BC 3000      CPI	R16,0
+    002BD 0701      CPC	R16,R17
+    002BE F421      BNE	0x02C3
+(0299) 		PORTD &=(0xff<<1);
+    002BF B18B      IN	R24,0x0B
+    002C0 7F8E      ANDI	R24,0xFE
+    002C1 B98B      OUT	0x0B,R24
+    002C2 C005      RJMP	0x02C8
+(0300) 	else if(direct==1)
+    002C3 3001      CPI	R16,1
+    002C4 E0E0      LDI	R30,0
+    002C5 071E      CPC	R17,R30
+    002C6 F409      BNE	0x02C8
+(0301) 		PORTD |=(1<<1);
+    002C7 9A59      SBI	0x0B,1
+    002C8 9508      RET
+(0302) 
+(0303) 	
+(0304) }
+(0305) 
+(0306) void motor4_stop()
+(0307) {
+(0308) 	PORTD &=~(1<<2);     //enable
+_motor4_stop:
+    002C9 985A      CBI	0x0B,2
+    002CA 9508      RET
+(0309) 
+(0310) }
+(0311) 
+(0312) void motor4_slow()
+(0313) {
+(0314) 	OCR3B = PULSE_WIDTH/2;	//Load Pulse width
+_motor4_slow:
+    002CB E78F      LDI	R24,0x7F
+    002CC E090      LDI	R25,0
+    002CD 9390 009B STS	0x9B,R25
+    002CF 9380 009A STS	0x9A,R24
+(0315) 	PORTD |=(1<<0);     //enable
+    002D1 9A58      SBI	0x0B,0
+    002D2 9508      RET
+(0316) 
+(0317) }
+(0318) 
+(0319) /***************************************motor5********************************************************************/
+(0320) 
+(0321) 
+(0322) 
+(0323) 
+(0324) void motor5_start(int direct){
+(0325) 	
+(0326) 	OCR4A = PULSE_WIDTH;
+_motor5_start:
+  direct               --> R16
+    002D3 EF8F      LDI	R24,0xFF
+    002D4 E090      LDI	R25,0
+    002D5 9390 00A9 STS	0xA9,R25
+    002D7 9380 00A8 STS	0xA8,R24
+(0327) 	DDRD |=(1<<6)|(1<<7) ;
+    002D9 B18A      IN	R24,0x0A
+    002DA 6C80      ORI	R24,0xC0
+    002DB B98A      OUT	0x0A,R24
+(0328) 	
+(0329) 	
+(0330) 	PORTD |=(1<<6);     //enable
+    002DC 9A5E      SBI	0x0B,6
+(0331) 	//设置方向
+(0332) 	if(direct==0)
+    002DD 3000      CPI	R16,0
+    002DE 0701      CPC	R16,R17
+    002DF F421      BNE	0x02E4
+(0333) 		PORTD &=(0xff<<7);
+    002E0 B18B      IN	R24,0x0B
+    002E1 7880      ANDI	R24,0x80
+    002E2 B98B      OUT	0x0B,R24
+    002E3 C005      RJMP	0x02E9
+(0334) 	else if(direct==1)
+    002E4 3001      CPI	R16,1
+    002E5 E0E0      LDI	R30,0
+    002E6 071E      CPC	R17,R30
+    002E7 F409      BNE	0x02E9
+(0335) 		PORTD |=(1<<7);
+    002E8 9A5F      SBI	0x0B,7
+    002E9 9508      RET
+(0336) 
+(0337) 	
+(0338) }
+(0339) 
+(0340) void motor5_stop()
+(0341) {
+(0342) 	PORTD &=~(1<<6);     //enable
+_motor5_stop:
+    002EA 985E      CBI	0x0B,6
+    002EB 9508      RET
+(0343) 
+(0344) }
+(0345) 
+(0346) void motor5_slow()
+(0347) {
+(0348) 	OCR4A = PULSE_WIDTH/2;	//Load Pulse width
+_motor5_slow:
+    002EC E78F      LDI	R24,0x7F
+    002ED E090      LDI	R25,0
+    002EE 9390 00A9 STS	0xA9,R25
+    002F0 9380 00A8 STS	0xA8,R24
+(0349) 	PORTD |=(1<<6);     //enable
+    002F2 9A5E      SBI	0x0B,6
+    002F3 9508      RET
+(0350) 
+(0351) }
+(0352) 
+(0353) 
+(0354) /***************************************motor6********************************************************************/
+(0355) 
+(0356) 
+(0357) 
+(0358) 
+(0359) void motor6_start(int direct){
+(0360) 	
+(0361) 	OCR4B = PULSE_WIDTH;
+_motor6_start:
+  direct               --> R16
+    002F4 EF8F      LDI	R24,0xFF
+    002F5 E090      LDI	R25,0
+    002F6 9390 00AB STS	0xAB,R25
+    002F8 9380 00AA STS	0xAA,R24
+(0362) 	DDRB |=(1<<3)|(1<<4) ;
+    002FA B184      IN	R24,0x04
+    002FB 6188      ORI	R24,0x18
+    002FC B984      OUT	0x04,R24
+(0363) 	
+(0364) 	
+(0365) 	PORTB |=(1<<3);     //enable
+    002FD 9A2B      SBI	0x05,3
+(0366) 	//设置方向
+(0367) 	if(direct==0)
+    002FE 3000      CPI	R16,0
+    002FF 0701      CPC	R16,R17
+    00300 F411      BNE	0x0303
+(0368) 		PORTB &=~(1<<4);
+    00301 982C      CBI	0x05,4
+    00302 C005      RJMP	0x0308
+(0369) 	else if(direct==1)
+    00303 3001      CPI	R16,1
+    00304 E0E0      LDI	R30,0
+    00305 071E      CPC	R17,R30
+    00306 F409      BNE	0x0308
+(0370) 		PORTB |=(1<<4);
+    00307 9A2C      SBI	0x05,4
+    00308 9508      RET
+(0371) 
+(0372) 	
+(0373) }
+(0374) 
+(0375) void motor6_stop()
+(0376) {
+(0377) 	PORTB &=~(1<<3);     //enable
+_motor6_stop:
+    00309 982B      CBI	0x05,3
+    0030A 9508      RET
+(0378) 
+(0379) }
+(0380) 
+(0381) void motor6_slow()
+(0382) {
+(0383) 	OCR4B = PULSE_WIDTH/2;	//Load Pulse width
+_motor6_slow:
+    0030B E78F      LDI	R24,0x7F
+    0030C E090      LDI	R25,0
+    0030D 9390 00AB STS	0xAB,R25
+    0030F 9380 00AA STS	0xAA,R24
+(0384) 	PORTB|=(1<<3);     //enable
+    00311 9A2B      SBI	0x05,3
+    00312 9508      RET
+(0385) 
+(0386) }
+(0387) /****************************************timer1 init**************************************************************/
+(0388) void timer1_init()
+(0389) {
+(0390) 	DDRB |= (1<<5)|(1<<6);		//PortD.5 as o/p	
+_timer1_init:
+    00313 B184      IN	R24,0x04
+    00314 6680      ORI	R24,0x60
+    00315 B984      OUT	0x04,R24
+(0391) 	OCR1A = PULSE_WIDTH;	//Load Pulse width
+    00316 EF8F      LDI	R24,0xFF
+    00317 E090      LDI	R25,0
+    00318 9390 0089 STS	0x89,R25
+    0031A 9380 0088 STS	0x88,R24
+(0392) 	OCR1B = PULSE_WIDTH;	//Load Pulse width
+    0031C 9390 008B STS	0x8B,R25
+    0031E 9380 008A STS	0x8A,R24
+(0393) 	//DDRD& =(0xff<<4);                   //PD4输入
+(0394) 	TCCR1A = 0x83;
+    00320 E883      LDI	R24,0x83
+    00321 9380 0080 STS	0x80,R24
+(0395) 	TCCR1B = 0x09; //start Timer
+    00323 E089      LDI	R24,0x9
+    00324 9380 0081 STS	0x81,R24
+(0396) 	TIMSK1	|=(1<<ICIE1);            //允许脉冲捕获中断
+    00326 9180 006F LDS	R24,0x6F
+    00328 6280      ORI	R24,0x20
+    00329 9380 006F STS	0x6F,R24
+    0032B 9508      RET
+(0397) 
+(0398) }
+(0399) 
+(0400) void timer3_init()
+(0401) {
+(0402) 	DDRE |=(1<<3)|(1<<4);
+_timer3_init:
+    0032C B18D      IN	R24,0x0D
+    0032D 6188      ORI	R24,0x18
+    0032E B98D      OUT	0x0D,R24
+(0403) 	OCR3A = PULSE_WIDTH;	//Load Pulse width
+    0032F EF8F      LDI	R24,0xFF
+    00330 E090      LDI	R25,0
+    00331 9390 0099 STS	0x99,R25
+    00333 9380 0098 STS	0x98,R24
+(0404) 	OCR3B = PULSE_WIDTH;	//Load Pulse width
+    00335 9390 009B STS	0x9B,R25
+    00337 9380 009A STS	0x9A,R24
+(0405) //	DDRE & =(0xff<<7);                   //PD4输入
+(0406) 	TCCR3A = 0x83;
+    00339 E883      LDI	R24,0x83
+    0033A 9380 0090 STS	0x90,R24
+(0407) 	TCCR3B = 0x09; //start Timer
+    0033C E089      LDI	R24,0x9
+    0033D 9380 0091 STS	0x91,R24
+(0408) 	TIMSK3	|=(1<<ICIE3);            //允许脉冲捕获中断
+    0033F 9180 0071 LDS	R24,0x71
+    00341 6280      ORI	R24,0x20
+    00342 9380 0071 STS	0x71,R24
+    00344 9508      RET
+(0409) 
+(0410) }
+(0411) 
+(0412) void timer4_init()
+(0413) {
+(0414) 	DDRH |=(1<<3)|(1<<4);
+_timer4_init:
+    00345 9180 0101 LDS	R24,0x101
+    00347 6188      ORI	R24,0x18
+    00348 9380 0101 STS	0x101,R24
+(0415) 	OCR4A = PULSE_WIDTH;	//Load Pulse width
+    0034A EF8F      LDI	R24,0xFF
+    0034B E090      LDI	R25,0
+    0034C 9390 00A9 STS	0xA9,R25
+    0034E 9380 00A8 STS	0xA8,R24
+(0416) 	OCR4B = PULSE_WIDTH;	//Load Pulse width
+    00350 9390 00AB STS	0xAB,R25
+    00352 9380 00AA STS	0xAA,R24
+(0417) //	DDRL & =(0xff<<0);                   //PD4输入
+(0418) 	TCCR4A = 0x83;
+    00354 E883      LDI	R24,0x83
+    00355 9380 00A0 STS	0xA0,R24
+(0419) 	TCCR4B = 0x09; //start Timer
+    00357 E089      LDI	R24,0x9
+    00358 9380 00A1 STS	0xA1,R24
+(0420) 	TIMSK4	|=(1<<ICIE4);            //允许脉冲捕获中断
+    0035A 9180 0072 LDS	R24,0x72
+    0035C 6280      ORI	R24,0x20
+    0035D 9380 0072 STS	0x72,R24
+    0035F 9508      RET
+(0421) 
+(0422) }
+(0423) 
+(0424) 
+(0425) void timer5_init()
+(0426) {
+(0427) 	
+(0428) 	//DDRL & =(0xff<<1);                   //PD4输入
+(0429) 	TCCR5A = 0x00;
+_timer5_init:
+    00360 2422      CLR	R2
+    00361 9220 0120 STS	0x120,R2
+(0430) 	TCCR5B = 0x09; //start Timer
+    00363 E089      LDI	R24,0x9
+    00364 9380 0121 STS	0x121,R24
+(0431) 	TIMSK5	|=(1<<ICIE5) ;           //允许脉冲捕获中断
+    00366 9180 0073 LDS	R24,0x73
+    00368 6280      ORI	R24,0x20
+    00369 9380 0073 STS	0x73,R24
+    0036B 9508      RET
+(0432) 
+(0433) }
+(0434) 
+(0435) void init_device(void)
+(0436) {
+(0437)  //stop errant interrupts until set up
+(0438)  CLI(); //disable all interrupts
+_init_device:
+    0036C 94F8      BCLR	7
+(0439)  //XDIV  = 0x00; //xtal divider
+(0440)  XMCRA = 0x00; //external memory
+    0036D 2422      CLR	R2
+    0036E 9220 0074 STS	0x74,R2
+(0441)  
+(0442)  //INIT PROT
+(0443)  DDRB=0XFF;
+    00370 EF8F      LDI	R24,0xFF
+    00371 B984      OUT	0x04,R24
+(0444)  PORTB=0X00;
+    00372 B825      OUT	0x05,R2
+(0445)  
+(0446)  DDRE=0XFF;
+    00373 B98D      OUT	0x0D,R24
+(0447)  PORTE=0X00;
+    00374 B82E      OUT	0x0E,R2
+(0448)  
+(0449)  DDRH=0XFF;
+    00375 9380 0101 STS	0x101,R24
+(0450)  PORTH=0X00;
+    00377 9220 0102 STS	0x102,R2
+(0451) 
+(0452)  //watchdog_init();
+(0453)  PORTL=0X00;
+    00379 9220 010B STS	0x10B,R2
+(0454)  DDRL=0X3F;     //PL0,1输入，其他输出
+    0037B E38F      LDI	R24,0x3F
+    0037C 9380 010A STS	0x10A,R24
+(0455)  
+(0456)  PORTK=0X00;
+    0037E 9220 0108 STS	0x108,R2
+(0457)  DDRK=0X00;
+    00380 9220 0107 STS	0x107,R2
+(0458)  
+(0459)  //timer1_init();  //停止状态机
+(0460)  
+(0461)  USART0_Init(MYUBRR);
+    00382 E407      LDI	R16,0x47
+    00383 E010      LDI	R17,0
+    00384 DE64      RCALL	_USART0_Init
+(0462)  USART1_Init(MYUBRR);
+    00385 E407      LDI	R16,0x47
+    00386 E010      LDI	R17,0
+    00387 DE76      RCALL	_USART1_Init
+(0463)  //MCUCR = 0x00;
+(0464)  timer1_init();
+    00388 DF8A      RCALL	_timer1_init
+(0465)  timer3_init();
+    00389 DFA2      RCALL	_timer3_init
+(0466)  timer4_init();
+    0038A DFBA      RCALL	_timer4_init
+(0467)  timer5_init();
+    0038B DFD4      RCALL	_timer5_init
+(0468)  
+(0469)  
+(0470)   Position1=0;
+    0038C E080      LDI	R24,0
+    0038D 9380 022E STS	Position1,R24
+    0038F 9380 022F STS	Position1+1,R24
+    00391 9380 0230 STS	Position1+2,R24
+    00393 9380 0231 STS	Position1+3,R24
+(0471) 
+(0472) 
+(0473)  Position2=0;
+    00395 E080      LDI	R24,0
+    00396 9380 0228 STS	Position2,R24
+    00398 9380 0229 STS	Position2+1,R24
+    0039A 9380 022A STS	Position2+2,R24
+    0039C 9380 022B STS	Position2+3,R24
+(0474) 
+(0475) 
+(0476)  Position3=0;
+    0039E E080      LDI	R24,0
+    0039F 9380 0222 STS	Position3,R24
+    003A1 9380 0223 STS	Position3+1,R24
+    003A3 9380 0224 STS	Position3+2,R24
+    003A5 9380 0225 STS	Position3+3,R24
+(0477)  
+(0478)  Position4=0;
+    003A7 E080      LDI	R24,0
+    003A8 9380 021C STS	Position4,R24
+    003AA 9380 021D STS	Position4+1,R24
+    003AC 9380 021E STS	Position4+2,R24
+    003AE 9380 021F STS	Position4+3,R24
+(0479) 
+(0480) 
+(0481)  Position5=0;
+    003B0 E080      LDI	R24,0
+    003B1 9380 0216 STS	Position5,R24
+    003B3 9380 0217 STS	Position5+1,R24
+    003B5 9380 0218 STS	Position5+2,R24
+    003B7 9380 0219 STS	Position5+3,R24
+(0482) 
+(0483) 
+(0484)  motor1Step=0;
+    003B9 E080      LDI	R24,0
+    003BA 9380 0210 STS	motor1Step,R24
+    003BC 9380 0211 STS	motor1Step+1,R24
+    003BE 9380 0212 STS	motor1Step+2,R24
+    003C0 9380 0213 STS	motor1Step+3,R24
+(0485)  motor2Step=0;
+    003C2 E080      LDI	R24,0
+    003C3 9380 020C STS	motor2Step,R24
+    003C5 9380 020D STS	motor2Step+1,R24
+    003C7 9380 020E STS	motor2Step+2,R24
+    003C9 9380 020F STS	motor2Step+3,R24
+(0486)  motor3Step=0;
+    003CB E080      LDI	R24,0
+    003CC 9380 0208 STS	motor3Step,R24
+    003CE 9380 0209 STS	motor3Step+1,R24
+    003D0 9380 020A STS	motor3Step+2,R24
+    003D2 9380 020B STS	motor3Step+3,R24
+(0487)  motor4Step=0;
+    003D4 E080      LDI	R24,0
+    003D5 9380 0204 STS	motor4Step,R24
+    003D7 9380 0205 STS	motor4Step+1,R24
+    003D9 9380 0206 STS	motor4Step+2,R24
+    003DB 9380 0207 STS	motor4Step+3,R24
+(0488)  motor5Step=0;
+    003DD E080      LDI	R24,0
+    003DE 9380 0200 STS	motor5Step,R24
+    003E0 9380 0201 STS	motor5Step+1,R24
+    003E2 9380 0202 STS	motor5Step+2,R24
+    003E4 9380 0203 STS	motor5Step+3,R24
+(0489) SEI(); //re-enable interrupts
+    003E6 9478      BSET	7
+    003E7 9508      RET
+_delayms:
+  i                    --> Y,+4
+  j                    --> Y,+0
+  n                    --> Y,+8
+    003E8 931A      ST	-Y,R17
+    003E9 930A      ST	-Y,R16
+    003EA 9728      SBIW	R28,0x8
+(0490)  //all peripherals are now initialized
+(0491) 
+(0492) 
+(0493) }
+(0494) 
+(0495) void  delayms(volatile unsigned int n)       
+(0496) { long i;
+(0497)   long j;
+(0498)   for(i=0;i<100;i++)
+    003EB E080      LDI	R24,0
+    003EC 838C      STD	Y+4,R24
+    003ED 838D      STD	Y+5,R24
+    003EE 838E      STD	Y+6,R24
+    003EF 838F      STD	Y+7,R24
+(0499)   {
+(0500)   	  for(j=n;j>0;j--)
+    003F0 8428      LDD	R2,Y+8
+    003F1 8439      LDD	R3,Y+9
+    003F2 2444      CLR	R4
+    003F3 2455      CLR	R5
+    003F4 8228      ST	Y,R2
+    003F5 8239      STD	Y+1,R3
+    003F6 824A      STD	Y+2,R4
+    003F7 825B      STD	Y+3,R5
+    003F8 C010      RJMP	0x0409
+    003F9 E081      LDI	R24,1
+    003FA E090      LDI	R25,0
+    003FB E0A0      LDI	R26,0
+    003FC E0B0      LDI	R27,0
+    003FD 8028      LD	R2,Y
+    003FE 8039      LDD	R3,Y+1
+    003FF 804A      LDD	R4,Y+2
+    00400 805B      LDD	R5,Y+3
+    00401 1A28      SUB	R2,R24
+    00402 0A39      SBC	R3,R25
+    00403 0A4A      SBC	R4,R26
+    00404 0A5B      SBC	R5,R27
+    00405 8228      ST	Y,R2
+    00406 8239      STD	Y+1,R3
+    00407 824A      STD	Y+2,R4
+    00408 825B      STD	Y+3,R5
+    00409 E080      LDI	R24,0
+    0040A E090      LDI	R25,0
+    0040B E0A0      LDI	R26,0
+    0040C E0B0      LDI	R27,0
+    0040D 8028      LD	R2,Y
+    0040E 8039      LDD	R3,Y+1
+    0040F 804A      LDD	R4,Y+2
+    00410 805B      LDD	R5,Y+3
+    00411 1582      CP	R24,R2
+    00412 0593      CPC	R25,R3
+    00413 05A4      CPC	R26,R4
+    00414 05B5      CPC	R27,R5
+    00415 F31C      BLT	0x03F9
+    00416 E081      LDI	R24,1
+    00417 E090      LDI	R25,0
+    00418 E0A0      LDI	R26,0
+    00419 E0B0      LDI	R27,0
+    0041A 802C      LDD	R2,Y+4
+    0041B 803D      LDD	R3,Y+5
+    0041C 804E      LDD	R4,Y+6
+    0041D 805F      LDD	R5,Y+7
+    0041E 0E28      ADD	R2,R24
+    0041F 1E39      ADC	R3,R25
+    00420 1E4A      ADC	R4,R26
+    00421 1E5B      ADC	R5,R27
+    00422 822C      STD	Y+4,R2
+    00423 823D      STD	Y+5,R3
+    00424 824E      STD	Y+6,R4
+    00425 825F      STD	Y+7,R5
+    00426 E684      LDI	R24,0x64
+    00427 E090      LDI	R25,0
+    00428 E0A0      LDI	R26,0
+    00429 E0B0      LDI	R27,0
+    0042A 802C      LDD	R2,Y+4
+    0042B 803D      LDD	R3,Y+5
+    0042C 804E      LDD	R4,Y+6
+    0042D 805F      LDD	R5,Y+7
+    0042E 1628      CP	R2,R24
+    0042F 0639      CPC	R3,R25
+    00430 064A      CPC	R4,R26
+    00431 065B      CPC	R5,R27
+    00432 F40C      BGE	0x0434
+    00433 CFBC      RJMP	0x03F0
+    00434 962A      ADIW	R28,0xA
+    00435 9508      RET
+(0501) 	  {}
+(0502)   	} 
+(0503)  
+(0504) } 
+(0505) void main()
+(0506) {
+(0507)  
+(0508) 	init_device();
+_main:
+    00436 DF35      RCALL	_init_device
+    00437 C019      RJMP	0x0451
+(0509) 	
+(0510) 	
+(0511) 	
+(0512) 	while(1)
+(0513) 	{motor1_start(MOTOR_FORWARD);
+    00438 E001      LDI	R16,1
+    00439 E010      LDI	R17,0
+    0043A DDD8      RCALL	_motor1_start
+(0514) 	motor3_start(MOTOR_FORWARD);
+    0043B E001      LDI	R16,1
+    0043C E010      LDI	R17,0
+    0043D DE3F      RCALL	_motor3_start
+(0515) 	motor4_start(MOTOR_FORWARD);
+    0043E E001      LDI	R16,1
+    0043F E010      LDI	R17,0
+    00440 DE71      RCALL	_motor4_start
+(0516) 	motor5_start(MOTOR_FORWARD);
+    00441 E001      LDI	R16,1
+    00442 E010      LDI	R17,0
+    00443 DE8F      RCALL	_motor5_start
+(0517) 	PORTB=0b00000111;
+    00444 E087      LDI	R24,7
+    00445 B985      OUT	0x05,R24
+(0518) 	delayms(1000);
+    00446 EE08      LDI	R16,0xE8
+    00447 E013      LDI	R17,3
+    00448 DF9F      RCALL	_delayms
+(0519)     USART0_Transmit( 'A' );
+    00449 E401      LDI	R16,0x41
+    0044A DDAC      RCALL	_USART0_Transmit
+(0520) 	 USART1_Transmit( 'A' );
+    0044B E401      LDI	R16,0x41
+    0044C DDBF      RCALL	_USART1_Transmit
+(0521) 	 motor1_stop();
+    0044D DDE8      RCALL	_motor1_stop
+(0522) 	 motor3_stop();
+    0044E DE51      RCALL	_motor3_stop
+(0523) 	 motor4_stop();
+    0044F DE79      RCALL	_motor4_stop
+(0524) 	 motor5_stop();
+FILE: <library>
+    00450 DE99      RCALL	_motor5_stop
+    00451 CFE6      RJMP	0x0438
+    00452 9508      RET

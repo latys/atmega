@@ -1,0 +1,1805 @@
+                        .module motor.c
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+                        .area vector(rom, abs)
+                        .org 100
+ 0064 0C94E000          jmp _uart0_isr
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+                        .area vector(rom, abs)
+                        .org 144
+ 0090 0C94E100          jmp _uart1_isr
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+                        .area vector(rom, abs)
+                        .org 64
+ 0040 0C940000          jmp _timer1CAP_isr
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+                        .area vector(rom, abs)
+                        .org 124
+ 007C 0C945100          jmp _timer3CAP_isr
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+                        .area vector(rom, abs)
+                        .org 164
+ 00A4 0C947E00          jmp _timer4CAP_isr
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+                        .area vector(rom, abs)
+                        .org 184
+ 00B8 0C94B300          jmp _timer5CAP_isr
+                        .area text(rom, con, rel)
+ 0000                   .dbfile motor.c
+ 0000                   .dbfile E:\工作\atmage640\motor.c
+ 0000                   .dbfunc e timer1CAP_isr _timer1CAP_isr fV
+                        .even
+ 0000           _timer1CAP_isr::
+ 0000 0A92              st -y,R0
+ 0002 1A92              st -y,R1
+ 0004 2A92              st -y,R2
+ 0006 3A92              st -y,R3
+ 0008 4A92              st -y,R4
+ 000A 5A92              st -y,R5
+ 000C 0A93              st -y,R16
+ 000E 1A93              st -y,R17
+ 0010 2A93              st -y,R18
+ 0012 3A93              st -y,R19
+ 0014 8A93              st -y,R24
+ 0016 9A93              st -y,R25
+ 0018 AA93              st -y,R26
+ 001A BA93              st -y,R27
+ 001C 0FB6              IN R0,63
+ 001E 0A92              st -y,R0
+ 0020                   .dbline -1
+ 0020                   .dbline 112
+ 0020           ; # include <iom640v.h>
+ 0020           ; # include <AVRdef.h>
+ 0020           ; 
+ 0020           ; /**************************引脚说明**************************************************************************************************
+ 0020           ; motor1:
+ 0020           ;         oc1A->pwm
+ 0020           ;         PORTL:2->enable
+ 0020           ;         PortL:3->方向
+ 0020           ;         ICP1->霍尔元件脉冲检测
+ 0020           ; motor2:
+ 0020           ;         oc1B->pwm
+ 0020           ;         PORTL:4->enable
+ 0020           ;         PortL:5->方向
+ 0020           ;         ICP3->霍尔元件脉冲检测
+ 0020           ; motor3:
+ 0020           ;         oc3A->pwm
+ 0020           ;         PORTL:6->enable
+ 0020           ;         PortL:7->方向
+ 0020           ;         ICP4->霍尔元件脉冲检测
+ 0020           ; motor4:
+ 0020           ;         oc3B->pwm
+ 0020           ;         PORTD:0->enable
+ 0020           ;         PortD:1->方向
+ 0020           ;         ICP5->霍尔元件脉冲检测
+ 0020           ; motor5:
+ 0020           ;         oc4A->pwm
+ 0020           ;         PORTD:6->enable
+ 0020           ;         PortD:7->方向
+ 0020           ;         外部芯片->霍尔元件脉冲检测
+ 0020           ; motor6:
+ 0020           ;         oc4B->pwm
+ 0020           ;         PORTB:3->enable
+ 0020           ;         PortB:4->方向
+ 0020           ;         外部芯片->霍尔元件脉冲检测
+ 0020           ;         
+ 0020           ;         
+ 0020           ;         
+ 0020           ;         
+ 0020           ; LED:
+ 0020           ;       PB:0,1,2
+ 0020           ;       PH:5,6
+ 0020           ;       PE:6
+ 0020           ;       
+ 0020           ;       
+ 0020           ;       
+ 0020           ; 限位检测：
+ 0020           ; 
+ 0020           ;       PK:0,1
+ 0020           ;          2,3
+ 0020           ;          4,5
+ 0020           ;          6,7
+ 0020           ;       
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; ***************************************************************************************************************************************/
+ 0020           ; 
+ 0020           ; #define PULSE_WIDTH 0xff
+ 0020           ; 
+ 0020           ; #define MOTOR_FORWARD 0X01                                 //方向向前
+ 0020           ; #define MOTOR_BACKWARD 0X00                                                           //方向后退
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; #define FOSC 11059200// Clock Speed
+ 0020           ; #define BAUD 9600
+ 0020           ; #define MYUBRR (FOSC/16/BAUD-1)
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; /************************************************中断函数声明***********************************************************************/
+ 0020           ; 
+ 0020           ; #pragma interrupt_handler uart0_isr:26                         //uart0接收中断26
+ 0020           ; #pragma interrupt_handler uart1_isr:37                         //uart0接收中断37
+ 0020           ; 
+ 0020           ; #pragma interrupt_handler timer1CAP_isr:17                     //定时器1脉冲检测中断
+ 0020           ; #pragma interrupt_handler timer3CAP_isr:32                     //定时器3脉冲检测中断
+ 0020           ; #pragma interrupt_handler timer4CAP_isr:42                     //定时器4脉冲检测中断
+ 0020           ; #pragma interrupt_handler timer5CAP_isr:47                     //定时器5脉冲检测中断
+ 0020           ; 
+ 0020           ; /***********************************************************************************************************************************/
+ 0020           ; long Position1;
+ 0020           ; int Direct1;
+ 0020           ; 
+ 0020           ; long Position2;
+ 0020           ; int Direct2;
+ 0020           ; 
+ 0020           ; long Position3;
+ 0020           ; int Direct3;
+ 0020           ; 
+ 0020           ; long Position4;
+ 0020           ; int Direct4;
+ 0020           ; 
+ 0020           ; long Position5;
+ 0020           ; int Direct5;
+ 0020           ; 
+ 0020           ; long motor1Step;
+ 0020           ; long motor2Step;
+ 0020           ; long motor3Step;
+ 0020           ; long motor4Step;
+ 0020           ; long motor5Step;
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; 
+ 0020           ; /*****************************************中断函数**********************************************************************************/
+ 0020           ; void timer1CAP_isr()
+ 0020           ; {
+ 0020                   .dbline 113
+ 0020           ;       motor1Step++;
+ 0020 81E0              ldi R24,1
+ 0022 90E0              ldi R25,0
+ 0024 A0E0              ldi R26,0
+ 0026 B0E0              ldi R27,0
+ 0028 40901200          lds R4,_motor1Step+2
+ 002C 50901300          lds R5,_motor1Step+2+1
+ 0030 20901000          lds R2,_motor1Step
+ 0034 30901100          lds R3,_motor1Step+1
+ 0038 280E              add R2,R24
+ 003A 391E              adc R3,R25
+ 003C 4A1E              adc R4,R26
+ 003E 5B1E              adc R5,R27
+ 0040 30921100          sts _motor1Step+1,R3
+ 0044 20921000          sts _motor1Step,R2
+ 0048 50921300          sts _motor1Step+2+1,R5
+ 004C 40921200          sts _motor1Step+2,R4
+ 0050                   .dbline 114
+ 0050           ;       motor2Step++;
+ 0050 81E0              ldi R24,1
+ 0052 90E0              ldi R25,0
+ 0054 A0E0              ldi R26,0
+ 0056 B0E0              ldi R27,0
+ 0058 40900E00          lds R4,_motor2Step+2
+ 005C 50900F00          lds R5,_motor2Step+2+1
+ 0060 20900C00          lds R2,_motor2Step
+ 0064 30900D00          lds R3,_motor2Step+1
+ 0068 280E              add R2,R24
+ 006A 391E              adc R3,R25
+ 006C 4A1E              adc R4,R26
+ 006E 5B1E              adc R5,R27
+ 0070 30920D00          sts _motor2Step+1,R3
+ 0074 20920C00          sts _motor2Step,R2
+ 0078 50920F00          sts _motor2Step+2+1,R5
+ 007C 40920E00          sts _motor2Step+2,R4
+ 0080                   .dbline -2
+ 0080           L1:
+ 0080                   .dbline 0 ; func end
+ 0080 0990              ld R0,y+
+ 0082 0FBE              OUT 63,R0
+ 0084 B991              ld R27,y+
+ 0086 A991              ld R26,y+
+ 0088 9991              ld R25,y+
+ 008A 8991              ld R24,y+
+ 008C 3991              ld R19,y+
+ 008E 2991              ld R18,y+
+ 0090 1991              ld R17,y+
+ 0092 0991              ld R16,y+
+ 0094 5990              ld R5,y+
+ 0096 4990              ld R4,y+
+ 0098 3990              ld R3,y+
+ 009A 2990              ld R2,y+
+ 009C 1990              ld R1,y+
+ 009E 0990              ld R0,y+
+ 00A0 1895              reti
+ 00A2                   .dbend
+ 00A2                   .dbfunc e timer3CAP_isr _timer3CAP_isr fV
+                        .even
+ 00A2           _timer3CAP_isr::
+ 00A2 2A92              st -y,R2
+ 00A4 3A92              st -y,R3
+ 00A6 4A92              st -y,R4
+ 00A8 5A92              st -y,R5
+ 00AA 8A93              st -y,R24
+ 00AC 9A93              st -y,R25
+ 00AE AA93              st -y,R26
+ 00B0 BA93              st -y,R27
+ 00B2 2FB6              IN R2,63
+ 00B4 2A92              st -y,R2
+ 00B6                   .dbline -1
+ 00B6                   .dbline 119
+ 00B6           ; 
+ 00B6           ; }
+ 00B6           ; 
+ 00B6           ; void timer3CAP_isr()
+ 00B6           ; {
+ 00B6                   .dbline 120
+ 00B6           ;       motor3Step++;
+ 00B6 81E0              ldi R24,1
+ 00B8 90E0              ldi R25,0
+ 00BA A0E0              ldi R26,0
+ 00BC B0E0              ldi R27,0
+ 00BE 40900A00          lds R4,_motor3Step+2
+ 00C2 50900B00          lds R5,_motor3Step+2+1
+ 00C6 20900800          lds R2,_motor3Step
+ 00CA 30900900          lds R3,_motor3Step+1
+ 00CE 280E              add R2,R24
+ 00D0 391E              adc R3,R25
+ 00D2 4A1E              adc R4,R26
+ 00D4 5B1E              adc R5,R27
+ 00D6 30920900          sts _motor3Step+1,R3
+ 00DA 20920800          sts _motor3Step,R2
+ 00DE 50920B00          sts _motor3Step+2+1,R5
+ 00E2 40920A00          sts _motor3Step+2,R4
+ 00E6                   .dbline -2
+ 00E6           L2:
+ 00E6                   .dbline 0 ; func end
+ 00E6 2990              ld R2,y+
+ 00E8 2FBE              OUT 63,R2
+ 00EA B991              ld R27,y+
+ 00EC A991              ld R26,y+
+ 00EE 9991              ld R25,y+
+ 00F0 8991              ld R24,y+
+ 00F2 5990              ld R5,y+
+ 00F4 4990              ld R4,y+
+ 00F6 3990              ld R3,y+
+ 00F8 2990              ld R2,y+
+ 00FA 1895              reti
+ 00FC                   .dbend
+ 00FC                   .dbfunc e timer4CAP_isr _timer4CAP_isr fV
+                        .even
+ 00FC           _timer4CAP_isr::
+ 00FC 2A92              st -y,R2
+ 00FE 3A92              st -y,R3
+ 0100 4A92              st -y,R4
+ 0102 5A92              st -y,R5
+ 0104 0A93              st -y,R16
+ 0106 1A93              st -y,R17
+ 0108 2A93              st -y,R18
+ 010A 3A93              st -y,R19
+ 010C 8A93              st -y,R24
+ 010E 9A93              st -y,R25
+ 0110 AA93              st -y,R26
+ 0112 BA93              st -y,R27
+ 0114 2FB6              IN R2,63
+ 0116 2A92              st -y,R2
+ 0118                   .dbline -1
+ 0118                   .dbline 125
+ 0118           ; 
+ 0118           ; }
+ 0118           ; 
+ 0118           ; void timer4CAP_isr()
+ 0118           ; {
+ 0118                   .dbline 126
+ 0118           ;       motor4Step++;
+ 0118 81E0              ldi R24,1
+ 011A 90E0              ldi R25,0
+ 011C A0E0              ldi R26,0
+ 011E B0E0              ldi R27,0
+ 0120 40900600          lds R4,_motor4Step+2
+ 0124 50900700          lds R5,_motor4Step+2+1
+ 0128 20900400          lds R2,_motor4Step
+ 012C 30900500          lds R3,_motor4Step+1
+ 0130 280E              add R2,R24
+ 0132 391E              adc R3,R25
+ 0134 4A1E              adc R4,R26
+ 0136 5B1E              adc R5,R27
+ 0138 30920500          sts _motor4Step+1,R3
+ 013C 20920400          sts _motor4Step,R2
+ 0140 50920700          sts _motor4Step+2+1,R5
+ 0144 40920600          sts _motor4Step+2,R4
+ 0148                   .dbline -2
+ 0148           L3:
+ 0148                   .dbline 0 ; func end
+ 0148 2990              ld R2,y+
+ 014A 2FBE              OUT 63,R2
+ 014C B991              ld R27,y+
+ 014E A991              ld R26,y+
+ 0150 9991              ld R25,y+
+ 0152 8991              ld R24,y+
+ 0154 3991              ld R19,y+
+ 0156 2991              ld R18,y+
+ 0158 1991              ld R17,y+
+ 015A 0991              ld R16,y+
+ 015C 5990              ld R5,y+
+ 015E 4990              ld R4,y+
+ 0160 3990              ld R3,y+
+ 0162 2990              ld R2,y+
+ 0164 1895              reti
+ 0166                   .dbend
+ 0166                   .dbfunc e timer5CAP_isr _timer5CAP_isr fV
+                        .even
+ 0166           _timer5CAP_isr::
+ 0166 2A92              st -y,R2
+ 0168 3A92              st -y,R3
+ 016A 4A92              st -y,R4
+ 016C 5A92              st -y,R5
+ 016E 8A93              st -y,R24
+ 0170 9A93              st -y,R25
+ 0172 AA93              st -y,R26
+ 0174 BA93              st -y,R27
+ 0176 2FB6              IN R2,63
+ 0178 2A92              st -y,R2
+ 017A                   .dbline -1
+ 017A                   .dbline 130
+ 017A           ; 
+ 017A           ; }
+ 017A           ; void timer5CAP_isr()
+ 017A           ; {
+ 017A                   .dbline 131
+ 017A           ;       motor5Step++;
+ 017A 81E0              ldi R24,1
+ 017C 90E0              ldi R25,0
+ 017E A0E0              ldi R26,0
+ 0180 B0E0              ldi R27,0
+ 0182 40900200          lds R4,_motor5Step+2
+ 0186 50900300          lds R5,_motor5Step+2+1
+ 018A 20900000          lds R2,_motor5Step
+ 018E 30900100          lds R3,_motor5Step+1
+ 0192 280E              add R2,R24
+ 0194 391E              adc R3,R25
+ 0196 4A1E              adc R4,R26
+ 0198 5B1E              adc R5,R27
+ 019A 30920100          sts _motor5Step+1,R3
+ 019E 20920000          sts _motor5Step,R2
+ 01A2 50920300          sts _motor5Step+2+1,R5
+ 01A6 40920200          sts _motor5Step+2,R4
+ 01AA                   .dbline -2
+ 01AA           L4:
+ 01AA                   .dbline 0 ; func end
+ 01AA 2990              ld R2,y+
+ 01AC 2FBE              OUT 63,R2
+ 01AE B991              ld R27,y+
+ 01B0 A991              ld R26,y+
+ 01B2 9991              ld R25,y+
+ 01B4 8991              ld R24,y+
+ 01B6 5990              ld R5,y+
+ 01B8 4990              ld R4,y+
+ 01BA 3990              ld R3,y+
+ 01BC 2990              ld R2,y+
+ 01BE 1895              reti
+ 01C0                   .dbend
+ 01C0                   .dbfunc e uart0_isr _uart0_isr fI
+                        .even
+ 01C0           _uart0_isr::
+ 01C0                   .dbline -1
+ 01C0                   .dbline 136
+ 01C0           ; 
+ 01C0           ; }
+ 01C0           ; 
+ 01C0           ; uart0_isr()
+ 01C0           ; {
+ 01C0                   .dbline -2
+ 01C0           L5:
+ 01C0                   .dbline 0 ; func end
+ 01C0 1895              reti
+ 01C2                   .dbend
+ 01C2                   .dbfunc e uart1_isr _uart1_isr fI
+                        .even
+ 01C2           _uart1_isr::
+ 01C2                   .dbline -1
+ 01C2                   .dbline 141
+ 01C2           ; 
+ 01C2           ; }
+ 01C2           ; 
+ 01C2           ; uart1_isr()
+ 01C2           ; {
+ 01C2                   .dbline -2
+ 01C2           L6:
+ 01C2                   .dbline 0 ; func end
+ 01C2 1895              reti
+ 01C4                   .dbend
+ 01C4                   .dbfunc e USART0_Init _USART0_Init fV
+ 01C4           ;           ubrr -> R16,R17
+                        .even
+ 01C4           _USART0_Init::
+ 01C4                   .dbline -1
+ 01C4                   .dbline 146
+ 01C4           ; 
+ 01C4           ; 
+ 01C4           ; }
+ 01C4           ; /************************************************************************************************************************************/
+ 01C4           ; void USART0_Init( unsigned int ubrr){
+ 01C4                   .dbline 148
+ 01C4           ;       /* Set baud rate */
+ 01C4           ;       UBRR0H = (unsigned char)(ubrr>>8);
+ 01C4 1801              movw R2,R16
+ 01C6 232C              mov R2,R3
+ 01C8 3324              clr R3
+ 01CA 2092C500          sts 197,R2
+ 01CE                   .dbline 149
+ 01CE           ;       UBRR0L = (unsigned char)ubrr;
+ 01CE 0093C400          sts 196,R16
+ 01D2                   .dbline 151
+ 01D2           ;       /* Enable receiver and transmitter */
+ 01D2           ;       UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<<7);  //允许中断
+ 01D2 88E9              ldi R24,152
+ 01D4 8093C100          sts 193,R24
+ 01D8                   .dbline 153
+ 01D8           ;       /* Set frame format: 8data, 1stop bit */
+ 01D8           ;       UCSR0C = 0x06;
+ 01D8 86E0              ldi R24,6
+ 01DA 8093C200          sts 194,R24
+ 01DE                   .dbline -2
+ 01DE           L7:
+ 01DE                   .dbline 0 ; func end
+ 01DE 0895              ret
+ 01E0                   .dbsym r ubrr 16 i
+ 01E0                   .dbend
+ 01E0                   .dbfunc e USART0_Transmit _USART0_Transmit fV
+ 01E0           ;           data -> R16
+                        .even
+ 01E0           _USART0_Transmit::
+ 01E0                   .dbline -1
+ 01E0                   .dbline 157
+ 01E0           ; } // USART_Init
+ 01E0           ; 
+ 01E0           ; void USART0_Transmit( unsigned char data )
+ 01E0           ; {
+ 01E0           L9:
+ 01E0                   .dbline 160
+ 01E0           ;       /* Wait for empty transmit buffer */
+ 01E0           ;       while ( !( UCSR0A & (1<<UDRE0)) )
+ 01E0           ;       ;
+ 01E0           L10:
+ 01E0                   .dbline 159
+ 01E0 2090C000          lds R2,192
+ 01E4 25FE              sbrs R2,5
+ 01E6 FCCF              rjmp L9
+ 01E8           X0:
+ 01E8                   .dbline 162
+ 01E8           ;       /* Put data into buffer, sends the data */
+ 01E8           ;       UDR0 = data;
+ 01E8 0093C600          sts 198,R16
+ 01EC                   .dbline -2
+ 01EC           L8:
+ 01EC                   .dbline 0 ; func end
+ 01EC 0895              ret
+ 01EE                   .dbsym r data 16 c
+ 01EE                   .dbend
+ 01EE                   .dbfunc e USART1_Init _USART1_Init fV
+ 01EE           ;           ubrr -> R16,R17
+                        .even
+ 01EE           _USART1_Init::
+ 01EE                   .dbline -1
+ 01EE                   .dbline 165
+ 01EE           ; }
+ 01EE           ; 
+ 01EE           ; void USART1_Init( unsigned int ubrr){
+ 01EE                   .dbline 167
+ 01EE           ;       /* Set baud rate */
+ 01EE           ;       UBRR1H = (unsigned char)(ubrr>>8);
+ 01EE 1801              movw R2,R16
+ 01F0 232C              mov R2,R3
+ 01F2 3324              clr R3
+ 01F4 2092CD00          sts 205,R2
+ 01F8                   .dbline 168
+ 01F8           ;       UBRR1L = (unsigned char)ubrr;
+ 01F8 0093CC00          sts 204,R16
+ 01FC                   .dbline 170
+ 01FC           ;       /* Enable receiver and transmitter */
+ 01FC           ;       UCSR1B = (1<<RXEN1)|(1<<TXEN1)|(1<<7);  //允许中断
+ 01FC 88E9              ldi R24,152
+ 01FE 8093C900          sts 201,R24
+ 0202                   .dbline 172
+ 0202           ;       /* Set frame format: 8data, 1stop bit */
+ 0202           ;       UCSR1C = 0x06;
+ 0202 86E0              ldi R24,6
+ 0204 8093CA00          sts 202,R24
+ 0208                   .dbline -2
+ 0208           L12:
+ 0208                   .dbline 0 ; func end
+ 0208 0895              ret
+ 020A                   .dbsym r ubrr 16 i
+ 020A                   .dbend
+ 020A                   .dbfunc e USART1_Transmit _USART1_Transmit fV
+ 020A           ;           data -> R16
+                        .even
+ 020A           _USART1_Transmit::
+ 020A                   .dbline -1
+ 020A                   .dbline 176
+ 020A           ; } // USART_Init
+ 020A           ; 
+ 020A           ; void USART1_Transmit( unsigned char data )
+ 020A           ; {
+ 020A           L14:
+ 020A                   .dbline 179
+ 020A           ;       /* Wait for empty transmit buffer */
+ 020A           ;       while ( !( UCSR1A & (1<<UDRE1)) )
+ 020A           ;       ;
+ 020A           L15:
+ 020A                   .dbline 178
+ 020A 2090C800          lds R2,200
+ 020E 25FE              sbrs R2,5
+ 0210 FCCF              rjmp L14
+ 0212           X1:
+ 0212                   .dbline 181
+ 0212           ;       /* Put data into buffer, sends the data */
+ 0212           ;       UDR1 = data;
+ 0212 0093CE00          sts 206,R16
+ 0216                   .dbline -2
+ 0216           L13:
+ 0216                   .dbline 0 ; func end
+ 0216 0895              ret
+ 0218                   .dbsym r data 16 c
+ 0218                   .dbend
+ 0218                   .dbfunc e motor1_start _motor1_start fV
+ 0218           ;         direct -> R16,R17
+                        .even
+ 0218           _motor1_start::
+ 0218                   .dbline -1
+ 0218                   .dbline 186
+ 0218           ; }
+ 0218           ; 
+ 0218           ; 
+ 0218           ; /***************************************motor1********************************************************************/
+ 0218           ; void motor1_start(int direct){
+ 0218                   .dbline 188
+ 0218           ;       
+ 0218           ;       OCR1A = PULSE_WIDTH;
+ 0218 8FEF              ldi R24,255
+ 021A 90E0              ldi R25,0
+ 021C 90938900          sts 136+1,R25
+ 0220 80938800          sts 136,R24
+ 0224                   .dbline 189
+ 0224           ;       DDRL |=(1<<4)|(1<<5) ;
+ 0224 80910A01          lds R24,266
+ 0228 8063              ori R24,48
+ 022A 80930A01          sts 266,R24
+ 022E                   .dbline 192
+ 022E           ;       
+ 022E           ;       
+ 022E           ;       PORTL |=(1<<4);     //enable
+ 022E 80910B01          lds R24,267
+ 0232 8061              ori R24,16
+ 0234 80930B01          sts 267,R24
+ 0238                   .dbline 194
+ 0238           ;       //设置方向
+ 0238           ;       if(direct==0)
+ 0238 0030              cpi R16,0
+ 023A 0107              cpc R16,R17
+ 023C 31F4              brne L18
+ 023E           X2:
+ 023E                   .dbline 195
+ 023E           ;               PORTL &=(0xff<<5);
+ 023E 80910B01          lds R24,267
+ 0242 807E              andi R24,224
+ 0244 80930B01          sts 267,R24
+ 0248 09C0              xjmp L19
+ 024A           L18:
+ 024A                   .dbline 196
+ 024A           ;       else if(direct==1)
+ 024A 0130              cpi R16,1
+ 024C E0E0              ldi R30,0
+ 024E 1E07              cpc R17,R30
+ 0250 29F4              brne L20
+ 0252           X3:
+ 0252                   .dbline 197
+ 0252           ;               PORTL |=(1<<5);
+ 0252 80910B01          lds R24,267
+ 0256 8062              ori R24,32
+ 0258 80930B01          sts 267,R24
+ 025C           L20:
+ 025C           L19:
+ 025C                   .dbline -2
+ 025C           L17:
+ 025C                   .dbline 0 ; func end
+ 025C 0895              ret
+ 025E                   .dbsym r direct 16 I
+ 025E                   .dbend
+ 025E                   .dbfunc e motor1_stop _motor1_stop fV
+                        .even
+ 025E           _motor1_stop::
+ 025E                   .dbline -1
+ 025E                   .dbline 203
+ 025E           ; 
+ 025E           ;       
+ 025E           ; }
+ 025E           ; 
+ 025E           ; void motor1_stop()
+ 025E           ; {
+ 025E                   .dbline 204
+ 025E           ;       PORTL &=(0xff<<4);     //enable
+ 025E 80910B01          lds R24,267
+ 0262 807F              andi R24,240
+ 0264 80930B01          sts 267,R24
+ 0268                   .dbline -2
+ 0268           L22:
+ 0268                   .dbline 0 ; func end
+ 0268 0895              ret
+ 026A                   .dbend
+ 026A                   .dbfunc e motor1_slow _motor1_slow fV
+                        .even
+ 026A           _motor1_slow::
+ 026A                   .dbline -1
+ 026A                   .dbline 209
+ 026A           ; 
+ 026A           ; }
+ 026A           ; 
+ 026A           ; void motor1_slow()
+ 026A           ; {
+ 026A                   .dbline 210
+ 026A           ;       OCR1B = PULSE_WIDTH/2;  //Load Pulse width
+ 026A 8FE7              ldi R24,127
+ 026C 90E0              ldi R25,0
+ 026E 90938B00          sts 138+1,R25
+ 0272 80938A00          sts 138,R24
+ 0276                   .dbline 211
+ 0276           ;       PORTL |=(1<<4);     //enable
+ 0276 80910B01          lds R24,267
+ 027A 8061              ori R24,16
+ 027C 80930B01          sts 267,R24
+ 0280                   .dbline -2
+ 0280           L23:
+ 0280                   .dbline 0 ; func end
+ 0280 0895              ret
+ 0282                   .dbend
+ 0282                   .dbfunc e motor2_start _motor2_start fV
+ 0282           ;         direct -> R16,R17
+                        .even
+ 0282           _motor2_start::
+ 0282                   .dbline -1
+ 0282                   .dbline 221
+ 0282           ; 
+ 0282           ; }
+ 0282           ; 
+ 0282           ; 
+ 0282           ; /***************************************motor2********************************************************************/
+ 0282           ; 
+ 0282           ; 
+ 0282           ; 
+ 0282           ; 
+ 0282           ; void motor2_start(int direct){
+ 0282                   .dbline 223
+ 0282           ;       
+ 0282           ;       OCR1B = PULSE_WIDTH;
+ 0282 8FEF              ldi R24,255
+ 0284 90E0              ldi R25,0
+ 0286 90938B00          sts 138+1,R25
+ 028A 80938A00          sts 138,R24
+ 028E                   .dbline 224
+ 028E           ;       DDRL |=(1<<2)|(1<<3) ;
+ 028E 80910A01          lds R24,266
+ 0292 8C60              ori R24,12
+ 0294 80930A01          sts 266,R24
+ 0298                   .dbline 227
+ 0298           ;       
+ 0298           ;       
+ 0298           ;       PORTL |=(1<<2);     //enable
+ 0298 80910B01          lds R24,267
+ 029C 8460              ori R24,4
+ 029E 80930B01          sts 267,R24
+ 02A2                   .dbline 229
+ 02A2           ;       //设置方向
+ 02A2           ;       if(direct==0)
+ 02A2 0030              cpi R16,0
+ 02A4 0107              cpc R16,R17
+ 02A6 31F4              brne L25
+ 02A8           X4:
+ 02A8                   .dbline 230
+ 02A8           ;               PORTL &=(0xff<<3);
+ 02A8 80910B01          lds R24,267
+ 02AC 887F              andi R24,248
+ 02AE 80930B01          sts 267,R24
+ 02B2 09C0              xjmp L26
+ 02B4           L25:
+ 02B4                   .dbline 231
+ 02B4           ;       else if(direct==1)
+ 02B4 0130              cpi R16,1
+ 02B6 E0E0              ldi R30,0
+ 02B8 1E07              cpc R17,R30
+ 02BA 29F4              brne L27
+ 02BC           X5:
+ 02BC                   .dbline 232
+ 02BC           ;               PORTL |=(1<<3);
+ 02BC 80910B01          lds R24,267
+ 02C0 8860              ori R24,8
+ 02C2 80930B01          sts 267,R24
+ 02C6           L27:
+ 02C6           L26:
+ 02C6                   .dbline -2
+ 02C6           L24:
+ 02C6                   .dbline 0 ; func end
+ 02C6 0895              ret
+ 02C8                   .dbsym r direct 16 I
+ 02C8                   .dbend
+ 02C8                   .dbfunc e motor2_stop _motor2_stop fV
+                        .even
+ 02C8           _motor2_stop::
+ 02C8                   .dbline -1
+ 02C8                   .dbline 238
+ 02C8           ; 
+ 02C8           ;       
+ 02C8           ; }
+ 02C8           ; 
+ 02C8           ; void motor2_stop()
+ 02C8           ; {
+ 02C8                   .dbline 239
+ 02C8           ;       PORTL &=(0xff<<2);     //enable
+ 02C8 80910B01          lds R24,267
+ 02CC 8C7F              andi R24,252
+ 02CE 80930B01          sts 267,R24
+ 02D2                   .dbline -2
+ 02D2           L29:
+ 02D2                   .dbline 0 ; func end
+ 02D2 0895              ret
+ 02D4                   .dbend
+ 02D4                   .dbfunc e motor2_slow _motor2_slow fV
+                        .even
+ 02D4           _motor2_slow::
+ 02D4                   .dbline -1
+ 02D4                   .dbline 244
+ 02D4           ; 
+ 02D4           ; }
+ 02D4           ; 
+ 02D4           ; void motor2_slow()
+ 02D4           ; {
+ 02D4                   .dbline 245
+ 02D4           ;       OCR1A = PULSE_WIDTH/2;  //Load Pulse width
+ 02D4 8FE7              ldi R24,127
+ 02D6 90E0              ldi R25,0
+ 02D8 90938900          sts 136+1,R25
+ 02DC 80938800          sts 136,R24
+ 02E0                   .dbline 246
+ 02E0           ;       PORTL |=(1<<2);     //enable
+ 02E0 80910B01          lds R24,267
+ 02E4 8460              ori R24,4
+ 02E6 80930B01          sts 267,R24
+ 02EA                   .dbline -2
+ 02EA           L30:
+ 02EA                   .dbline 0 ; func end
+ 02EA 0895              ret
+ 02EC                   .dbend
+ 02EC                   .dbfunc e motor3_start _motor3_start fV
+ 02EC           ;         direct -> R16,R17
+                        .even
+ 02EC           _motor3_start::
+ 02EC                   .dbline -1
+ 02EC                   .dbline 255
+ 02EC           ; 
+ 02EC           ; }
+ 02EC           ; 
+ 02EC           ; /***************************************motor3********************************************************************/
+ 02EC           ; 
+ 02EC           ; 
+ 02EC           ; 
+ 02EC           ; 
+ 02EC           ; void motor3_start(int direct){
+ 02EC                   .dbline 257
+ 02EC           ;       
+ 02EC           ;       OCR3A = PULSE_WIDTH;
+ 02EC 8FEF              ldi R24,255
+ 02EE 90E0              ldi R25,0
+ 02F0 90939900          sts 152+1,R25
+ 02F4 80939800          sts 152,R24
+ 02F8                   .dbline 258
+ 02F8           ;       DDRL |=(1<<6)|(1<<7) ;
+ 02F8 80910A01          lds R24,266
+ 02FC 806C              ori R24,192
+ 02FE 80930A01          sts 266,R24
+ 0302                   .dbline 261
+ 0302           ;       
+ 0302           ;       
+ 0302           ;       PORTL |=(1<<6);     //enable
+ 0302 80910B01          lds R24,267
+ 0306 8064              ori R24,64
+ 0308 80930B01          sts 267,R24
+ 030C                   .dbline 263
+ 030C           ;       //设置方向
+ 030C           ;       if(direct==0)
+ 030C 0030              cpi R16,0
+ 030E 0107              cpc R16,R17
+ 0310 31F4              brne L32
+ 0312           X6:
+ 0312                   .dbline 264
+ 0312           ;               PORTL &=(0xff<<7);
+ 0312 80910B01          lds R24,267
+ 0316 8078              andi R24,128
+ 0318 80930B01          sts 267,R24
+ 031C 09C0              xjmp L33
+ 031E           L32:
+ 031E                   .dbline 265
+ 031E           ;       else if(direct==1)
+ 031E 0130              cpi R16,1
+ 0320 E0E0              ldi R30,0
+ 0322 1E07              cpc R17,R30
+ 0324 29F4              brne L34
+ 0326           X7:
+ 0326                   .dbline 266
+ 0326           ;               PORTL |=(1<<7);
+ 0326 80910B01          lds R24,267
+ 032A 8068              ori R24,128
+ 032C 80930B01          sts 267,R24
+ 0330           L34:
+ 0330           L33:
+ 0330                   .dbline -2
+ 0330           L31:
+ 0330                   .dbline 0 ; func end
+ 0330 0895              ret
+ 0332                   .dbsym r direct 16 I
+ 0332                   .dbend
+ 0332                   .dbfunc e motor3_stop _motor3_stop fV
+                        .even
+ 0332           _motor3_stop::
+ 0332                   .dbline -1
+ 0332                   .dbline 272
+ 0332           ; 
+ 0332           ;       
+ 0332           ; }
+ 0332           ; 
+ 0332           ; void motor3_stop()
+ 0332           ; {
+ 0332                   .dbline 273
+ 0332           ;       PORTL &=(0xff<<6);     //enable
+ 0332 80910B01          lds R24,267
+ 0336 807C              andi R24,192
+ 0338 80930B01          sts 267,R24
+ 033C                   .dbline -2
+ 033C           L36:
+ 033C                   .dbline 0 ; func end
+ 033C 0895              ret
+ 033E                   .dbend
+ 033E                   .dbfunc e motor3_slow _motor3_slow fV
+                        .even
+ 033E           _motor3_slow::
+ 033E                   .dbline -1
+ 033E                   .dbline 278
+ 033E           ; 
+ 033E           ; }
+ 033E           ; 
+ 033E           ; void motor3_slow()
+ 033E           ; {
+ 033E                   .dbline 279
+ 033E           ;       OCR3A = PULSE_WIDTH/2;  //Load Pulse width
+ 033E 8FE7              ldi R24,127
+ 0340 90E0              ldi R25,0
+ 0342 90939900          sts 152+1,R25
+ 0346 80939800          sts 152,R24
+ 034A                   .dbline 280
+ 034A           ;       PORTL |=(1<<6);     //enable
+ 034A 80910B01          lds R24,267
+ 034E 8064              ori R24,64
+ 0350 80930B01          sts 267,R24
+ 0354                   .dbline -2
+ 0354           L37:
+ 0354                   .dbline 0 ; func end
+ 0354 0895              ret
+ 0356                   .dbend
+ 0356                   .dbfunc e motor4_start _motor4_start fV
+ 0356           ;         direct -> R16,R17
+                        .even
+ 0356           _motor4_start::
+ 0356                   .dbline -1
+ 0356                   .dbline 290
+ 0356           ; 
+ 0356           ; }
+ 0356           ; 
+ 0356           ; 
+ 0356           ; /***************************************motor4********************************************************************/
+ 0356           ; 
+ 0356           ; 
+ 0356           ; 
+ 0356           ; 
+ 0356           ; void motor4_start(int direct){
+ 0356                   .dbline 292
+ 0356           ;       
+ 0356           ;       OCR3B = PULSE_WIDTH;
+ 0356 8FEF              ldi R24,255
+ 0358 90E0              ldi R25,0
+ 035A 90939B00          sts 154+1,R25
+ 035E 80939A00          sts 154,R24
+ 0362                   .dbline 293
+ 0362           ;       DDRD |=(1<<0)|(1<<1) ;
+ 0362 8AB1              in R24,0xa
+ 0364 8360              ori R24,3
+ 0366 8AB9              out 0xa,R24
+ 0368                   .dbline 296
+ 0368           ;       
+ 0368           ;       
+ 0368           ;       PORTD |=(1<<0);     //enable
+ 0368 589A              sbi 0xb,0
+ 036A                   .dbline 298
+ 036A           ;       //设置方向
+ 036A           ;       if(direct==0)
+ 036A 0030              cpi R16,0
+ 036C 0107              cpc R16,R17
+ 036E 21F4              brne L39
+ 0370           X8:
+ 0370                   .dbline 299
+ 0370           ;               PORTD &=(0xff<<1);
+ 0370 8BB1              in R24,0xb
+ 0372 8E7F              andi R24,254
+ 0374 8BB9              out 0xb,R24
+ 0376 05C0              xjmp L40
+ 0378           L39:
+ 0378                   .dbline 300
+ 0378           ;       else if(direct==1)
+ 0378 0130              cpi R16,1
+ 037A E0E0              ldi R30,0
+ 037C 1E07              cpc R17,R30
+ 037E 09F4              brne L41
+ 0380           X9:
+ 0380                   .dbline 301
+ 0380           ;               PORTD |=(1<<1);
+ 0380 599A              sbi 0xb,1
+ 0382           L41:
+ 0382           L40:
+ 0382                   .dbline -2
+ 0382           L38:
+ 0382                   .dbline 0 ; func end
+ 0382 0895              ret
+ 0384                   .dbsym r direct 16 I
+ 0384                   .dbend
+ 0384                   .dbfunc e motor4_stop _motor4_stop fV
+                        .even
+ 0384           _motor4_stop::
+ 0384                   .dbline -1
+ 0384                   .dbline 307
+ 0384           ; 
+ 0384           ;       
+ 0384           ; }
+ 0384           ; 
+ 0384           ; void motor4_stop()
+ 0384           ; {
+ 0384                   .dbline 308
+ 0384           ;       PORTD &=~(1<<2);     //enable
+ 0384 5A98              cbi 0xb,2
+ 0386                   .dbline -2
+ 0386           L43:
+ 0386                   .dbline 0 ; func end
+ 0386 0895              ret
+ 0388                   .dbend
+ 0388                   .dbfunc e motor4_slow _motor4_slow fV
+                        .even
+ 0388           _motor4_slow::
+ 0388                   .dbline -1
+ 0388                   .dbline 313
+ 0388           ; 
+ 0388           ; }
+ 0388           ; 
+ 0388           ; void motor4_slow()
+ 0388           ; {
+ 0388                   .dbline 314
+ 0388           ;       OCR3B = PULSE_WIDTH/2;  //Load Pulse width
+ 0388 8FE7              ldi R24,127
+ 038A 90E0              ldi R25,0
+ 038C 90939B00          sts 154+1,R25
+ 0390 80939A00          sts 154,R24
+ 0394                   .dbline 315
+ 0394           ;       PORTD |=(1<<0);     //enable
+ 0394 589A              sbi 0xb,0
+ 0396                   .dbline -2
+ 0396           L44:
+ 0396                   .dbline 0 ; func end
+ 0396 0895              ret
+ 0398                   .dbend
+ 0398                   .dbfunc e motor5_start _motor5_start fV
+ 0398           ;         direct -> R16,R17
+                        .even
+ 0398           _motor5_start::
+ 0398                   .dbline -1
+ 0398                   .dbline 324
+ 0398           ; 
+ 0398           ; }
+ 0398           ; 
+ 0398           ; /***************************************motor5********************************************************************/
+ 0398           ; 
+ 0398           ; 
+ 0398           ; 
+ 0398           ; 
+ 0398           ; void motor5_start(int direct){
+ 0398                   .dbline 326
+ 0398           ;       
+ 0398           ;       OCR4A = PULSE_WIDTH;
+ 0398 8FEF              ldi R24,255
+ 039A 90E0              ldi R25,0
+ 039C 9093A900          sts 168+1,R25
+ 03A0 8093A800          sts 168,R24
+ 03A4                   .dbline 327
+ 03A4           ;       DDRD |=(1<<6)|(1<<7) ;
+ 03A4 8AB1              in R24,0xa
+ 03A6 806C              ori R24,192
+ 03A8 8AB9              out 0xa,R24
+ 03AA                   .dbline 330
+ 03AA           ;       
+ 03AA           ;       
+ 03AA           ;       PORTD |=(1<<6);     //enable
+ 03AA 5E9A              sbi 0xb,6
+ 03AC                   .dbline 332
+ 03AC           ;       //设置方向
+ 03AC           ;       if(direct==0)
+ 03AC 0030              cpi R16,0
+ 03AE 0107              cpc R16,R17
+ 03B0 21F4              brne L46
+ 03B2           X10:
+ 03B2                   .dbline 333
+ 03B2           ;               PORTD &=(0xff<<7);
+ 03B2 8BB1              in R24,0xb
+ 03B4 8078              andi R24,128
+ 03B6 8BB9              out 0xb,R24
+ 03B8 05C0              xjmp L47
+ 03BA           L46:
+ 03BA                   .dbline 334
+ 03BA           ;       else if(direct==1)
+ 03BA 0130              cpi R16,1
+ 03BC E0E0              ldi R30,0
+ 03BE 1E07              cpc R17,R30
+ 03C0 09F4              brne L48
+ 03C2           X11:
+ 03C2                   .dbline 335
+ 03C2           ;               PORTD |=(1<<7);
+ 03C2 5F9A              sbi 0xb,7
+ 03C4           L48:
+ 03C4           L47:
+ 03C4                   .dbline -2
+ 03C4           L45:
+ 03C4                   .dbline 0 ; func end
+ 03C4 0895              ret
+ 03C6                   .dbsym r direct 16 I
+ 03C6                   .dbend
+ 03C6                   .dbfunc e motor5_stop _motor5_stop fV
+                        .even
+ 03C6           _motor5_stop::
+ 03C6                   .dbline -1
+ 03C6                   .dbline 341
+ 03C6           ; 
+ 03C6           ;       
+ 03C6           ; }
+ 03C6           ; 
+ 03C6           ; void motor5_stop()
+ 03C6           ; {
+ 03C6                   .dbline 342
+ 03C6           ;       PORTD &=~(1<<6);     //enable
+ 03C6 5E98              cbi 0xb,6
+ 03C8                   .dbline -2
+ 03C8           L50:
+ 03C8                   .dbline 0 ; func end
+ 03C8 0895              ret
+ 03CA                   .dbend
+ 03CA                   .dbfunc e motor5_slow _motor5_slow fV
+                        .even
+ 03CA           _motor5_slow::
+ 03CA                   .dbline -1
+ 03CA                   .dbline 347
+ 03CA           ; 
+ 03CA           ; }
+ 03CA           ; 
+ 03CA           ; void motor5_slow()
+ 03CA           ; {
+ 03CA                   .dbline 348
+ 03CA           ;       OCR4A = PULSE_WIDTH/2;  //Load Pulse width
+ 03CA 8FE7              ldi R24,127
+ 03CC 90E0              ldi R25,0
+ 03CE 9093A900          sts 168+1,R25
+ 03D2 8093A800          sts 168,R24
+ 03D6                   .dbline 349
+ 03D6           ;       PORTD |=(1<<6);     //enable
+ 03D6 5E9A              sbi 0xb,6
+ 03D8                   .dbline -2
+ 03D8           L51:
+ 03D8                   .dbline 0 ; func end
+ 03D8 0895              ret
+ 03DA                   .dbend
+ 03DA                   .dbfunc e motor6_start _motor6_start fV
+ 03DA           ;         direct -> R16,R17
+                        .even
+ 03DA           _motor6_start::
+ 03DA                   .dbline -1
+ 03DA                   .dbline 359
+ 03DA           ; 
+ 03DA           ; }
+ 03DA           ; 
+ 03DA           ; 
+ 03DA           ; /***************************************motor6********************************************************************/
+ 03DA           ; 
+ 03DA           ; 
+ 03DA           ; 
+ 03DA           ; 
+ 03DA           ; void motor6_start(int direct){
+ 03DA                   .dbline 361
+ 03DA           ;       
+ 03DA           ;       OCR4B = PULSE_WIDTH;
+ 03DA 8FEF              ldi R24,255
+ 03DC 90E0              ldi R25,0
+ 03DE 9093AB00          sts 170+1,R25
+ 03E2 8093AA00          sts 170,R24
+ 03E6                   .dbline 362
+ 03E6           ;       DDRB |=(1<<3)|(1<<4) ;
+ 03E6 84B1              in R24,0x4
+ 03E8 8861              ori R24,24
+ 03EA 84B9              out 0x4,R24
+ 03EC                   .dbline 365
+ 03EC           ;       
+ 03EC           ;       
+ 03EC           ;       PORTB |=(1<<3);     //enable
+ 03EC 2B9A              sbi 0x5,3
+ 03EE                   .dbline 367
+ 03EE           ;       //设置方向
+ 03EE           ;       if(direct==0)
+ 03EE 0030              cpi R16,0
+ 03F0 0107              cpc R16,R17
+ 03F2 11F4              brne L53
+ 03F4           X12:
+ 03F4                   .dbline 368
+ 03F4           ;               PORTB &=~(1<<4);
+ 03F4 2C98              cbi 0x5,4
+ 03F6 05C0              xjmp L54
+ 03F8           L53:
+ 03F8                   .dbline 369
+ 03F8           ;       else if(direct==1)
+ 03F8 0130              cpi R16,1
+ 03FA E0E0              ldi R30,0
+ 03FC 1E07              cpc R17,R30
+ 03FE 09F4              brne L55
+ 0400           X13:
+ 0400                   .dbline 370
+ 0400           ;               PORTB |=(1<<4);
+ 0400 2C9A              sbi 0x5,4
+ 0402           L55:
+ 0402           L54:
+ 0402                   .dbline -2
+ 0402           L52:
+ 0402                   .dbline 0 ; func end
+ 0402 0895              ret
+ 0404                   .dbsym r direct 16 I
+ 0404                   .dbend
+ 0404                   .dbfunc e motor6_stop _motor6_stop fV
+                        .even
+ 0404           _motor6_stop::
+ 0404                   .dbline -1
+ 0404                   .dbline 376
+ 0404           ; 
+ 0404           ;       
+ 0404           ; }
+ 0404           ; 
+ 0404           ; void motor6_stop()
+ 0404           ; {
+ 0404                   .dbline 377
+ 0404           ;       PORTB &=~(1<<3);     //enable
+ 0404 2B98              cbi 0x5,3
+ 0406                   .dbline -2
+ 0406           L57:
+ 0406                   .dbline 0 ; func end
+ 0406 0895              ret
+ 0408                   .dbend
+ 0408                   .dbfunc e motor6_slow _motor6_slow fV
+                        .even
+ 0408           _motor6_slow::
+ 0408                   .dbline -1
+ 0408                   .dbline 382
+ 0408           ; 
+ 0408           ; }
+ 0408           ; 
+ 0408           ; void motor6_slow()
+ 0408           ; {
+ 0408                   .dbline 383
+ 0408           ;       OCR4B = PULSE_WIDTH/2;  //Load Pulse width
+ 0408 8FE7              ldi R24,127
+ 040A 90E0              ldi R25,0
+ 040C 9093AB00          sts 170+1,R25
+ 0410 8093AA00          sts 170,R24
+ 0414                   .dbline 384
+ 0414           ;       PORTB|=(1<<3);     //enable
+ 0414 2B9A              sbi 0x5,3
+ 0416                   .dbline -2
+ 0416           L58:
+ 0416                   .dbline 0 ; func end
+ 0416 0895              ret
+ 0418                   .dbend
+ 0418                   .dbfunc e timer1_init _timer1_init fV
+                        .even
+ 0418           _timer1_init::
+ 0418                   .dbline -1
+ 0418                   .dbline 389
+ 0418           ; 
+ 0418           ; }
+ 0418           ; /****************************************timer1 init**************************************************************/
+ 0418           ; void timer1_init()
+ 0418           ; {
+ 0418                   .dbline 390
+ 0418           ;       DDRB |= (1<<5)|(1<<6);          //PortD.5 as o/p        
+ 0418 84B1              in R24,0x4
+ 041A 8066              ori R24,96
+ 041C 84B9              out 0x4,R24
+ 041E                   .dbline 391
+ 041E           ;       OCR1A = PULSE_WIDTH;    //Load Pulse width
+ 041E 8FEF              ldi R24,255
+ 0420 90E0              ldi R25,0
+ 0422 90938900          sts 136+1,R25
+ 0426 80938800          sts 136,R24
+ 042A                   .dbline 392
+ 042A           ;       OCR1B = PULSE_WIDTH;    //Load Pulse width
+ 042A 90938B00          sts 138+1,R25
+ 042E 80938A00          sts 138,R24
+ 0432                   .dbline 394
+ 0432           ;       //DDRD& =(0xff<<4);                   //PD4输入
+ 0432           ;       TCCR1A = 0x83;
+ 0432 83E8              ldi R24,131
+ 0434 80938000          sts 128,R24
+ 0438                   .dbline 395
+ 0438           ;       TCCR1B = 0x09; //start Timer
+ 0438 89E0              ldi R24,9
+ 043A 80938100          sts 129,R24
+ 043E                   .dbline 396
+ 043E           ;       TIMSK1  |=(1<<ICIE1);            //允许脉冲捕获中断
+ 043E 80916F00          lds R24,111
+ 0442 8062              ori R24,32
+ 0444 80936F00          sts 111,R24
+ 0448                   .dbline -2
+ 0448           L59:
+ 0448                   .dbline 0 ; func end
+ 0448 0895              ret
+ 044A                   .dbend
+ 044A                   .dbfunc e timer3_init _timer3_init fV
+                        .even
+ 044A           _timer3_init::
+ 044A                   .dbline -1
+ 044A                   .dbline 401
+ 044A           ; 
+ 044A           ; }
+ 044A           ; 
+ 044A           ; void timer3_init()
+ 044A           ; {
+ 044A                   .dbline 402
+ 044A           ;       DDRE |=(1<<3)|(1<<4);
+ 044A 8DB1              in R24,0xd
+ 044C 8861              ori R24,24
+ 044E 8DB9              out 0xd,R24
+ 0450                   .dbline 403
+ 0450           ;       OCR3A = PULSE_WIDTH;    //Load Pulse width
+ 0450 8FEF              ldi R24,255
+ 0452 90E0              ldi R25,0
+ 0454 90939900          sts 152+1,R25
+ 0458 80939800          sts 152,R24
+ 045C                   .dbline 404
+ 045C           ;       OCR3B = PULSE_WIDTH;    //Load Pulse width
+ 045C 90939B00          sts 154+1,R25
+ 0460 80939A00          sts 154,R24
+ 0464                   .dbline 406
+ 0464           ; //    DDRE & =(0xff<<7);                   //PD4输入
+ 0464           ;       TCCR3A = 0x83;
+ 0464 83E8              ldi R24,131
+ 0466 80939000          sts 144,R24
+ 046A                   .dbline 407
+ 046A           ;       TCCR3B = 0x09; //start Timer
+ 046A 89E0              ldi R24,9
+ 046C 80939100          sts 145,R24
+ 0470                   .dbline 408
+ 0470           ;       TIMSK3  |=(1<<ICIE3);            //允许脉冲捕获中断
+ 0470 80917100          lds R24,113
+ 0474 8062              ori R24,32
+ 0476 80937100          sts 113,R24
+ 047A                   .dbline -2
+ 047A           L60:
+ 047A                   .dbline 0 ; func end
+ 047A 0895              ret
+ 047C                   .dbend
+ 047C                   .dbfunc e timer4_init _timer4_init fV
+                        .even
+ 047C           _timer4_init::
+ 047C                   .dbline -1
+ 047C                   .dbline 413
+ 047C           ; 
+ 047C           ; }
+ 047C           ; 
+ 047C           ; void timer4_init()
+ 047C           ; {
+ 047C                   .dbline 414
+ 047C           ;       DDRH |=(1<<3)|(1<<4);
+ 047C 80910101          lds R24,257
+ 0480 8861              ori R24,24
+ 0482 80930101          sts 257,R24
+ 0486                   .dbline 415
+ 0486           ;       OCR4A = PULSE_WIDTH;    //Load Pulse width
+ 0486 8FEF              ldi R24,255
+ 0488 90E0              ldi R25,0
+ 048A 9093A900          sts 168+1,R25
+ 048E 8093A800          sts 168,R24
+ 0492                   .dbline 416
+ 0492           ;       OCR4B = PULSE_WIDTH;    //Load Pulse width
+ 0492 9093AB00          sts 170+1,R25
+ 0496 8093AA00          sts 170,R24
+ 049A                   .dbline 418
+ 049A           ; //    DDRL & =(0xff<<0);                   //PD4输入
+ 049A           ;       TCCR4A = 0x83;
+ 049A 83E8              ldi R24,131
+ 049C 8093A000          sts 160,R24
+ 04A0                   .dbline 419
+ 04A0           ;       TCCR4B = 0x09; //start Timer
+ 04A0 89E0              ldi R24,9
+ 04A2 8093A100          sts 161,R24
+ 04A6                   .dbline 420
+ 04A6           ;       TIMSK4  |=(1<<ICIE4);            //允许脉冲捕获中断
+ 04A6 80917200          lds R24,114
+ 04AA 8062              ori R24,32
+ 04AC 80937200          sts 114,R24
+ 04B0                   .dbline -2
+ 04B0           L61:
+ 04B0                   .dbline 0 ; func end
+ 04B0 0895              ret
+ 04B2                   .dbend
+ 04B2                   .dbfunc e timer5_init _timer5_init fV
+                        .even
+ 04B2           _timer5_init::
+ 04B2                   .dbline -1
+ 04B2                   .dbline 426
+ 04B2           ; 
+ 04B2           ; }
+ 04B2           ; 
+ 04B2           ; 
+ 04B2           ; void timer5_init()
+ 04B2           ; {
+ 04B2                   .dbline 429
+ 04B2           ;       
+ 04B2           ;       //DDRL & =(0xff<<1);                   //PD4输入
+ 04B2           ;       TCCR5A = 0x00;
+ 04B2 2224              clr R2
+ 04B4 20922001          sts 288,R2
+ 04B8                   .dbline 430
+ 04B8           ;       TCCR5B = 0x09; //start Timer
+ 04B8 89E0              ldi R24,9
+ 04BA 80932101          sts 289,R24
+ 04BE                   .dbline 431
+ 04BE           ;       TIMSK5  |=(1<<ICIE5) ;           //允许脉冲捕获中断
+ 04BE 80917300          lds R24,115
+ 04C2 8062              ori R24,32
+ 04C4 80937300          sts 115,R24
+ 04C8                   .dbline -2
+ 04C8           L62:
+ 04C8                   .dbline 0 ; func end
+ 04C8 0895              ret
+ 04CA                   .dbend
+ 04CA                   .dbfunc e init_device _init_device fV
+                        .even
+ 04CA           _init_device::
+ 04CA                   .dbline -1
+ 04CA                   .dbline 436
+ 04CA           ; 
+ 04CA           ; }
+ 04CA           ; 
+ 04CA           ; void init_device(void)
+ 04CA           ; {
+ 04CA                   .dbline 438
+ 04CA           ;  //stop errant interrupts until set up
+ 04CA           ;  CLI(); //disable all interrupts
+ 04CA F894              cli
+ 04CC                   .dbline 440
+ 04CC           ;  //XDIV  = 0x00; //xtal divider
+ 04CC           ;  XMCRA = 0x00; //external memory
+ 04CC 2224              clr R2
+ 04CE 20927400          sts 116,R2
+ 04D2                   .dbline 443
+ 04D2           ;  
+ 04D2           ;  //INIT PROT
+ 04D2           ;  DDRB=0XFF;
+ 04D2 8FEF              ldi R24,255
+ 04D4 84B9              out 0x4,R24
+ 04D6                   .dbline 444
+ 04D6           ;  PORTB=0X00;
+ 04D6 25B8              out 0x5,R2
+ 04D8                   .dbline 446
+ 04D8           ;  
+ 04D8           ;  DDRE=0XFF;
+ 04D8 8DB9              out 0xd,R24
+ 04DA                   .dbline 447
+ 04DA           ;  PORTE=0X00;
+ 04DA 2EB8              out 0xe,R2
+ 04DC                   .dbline 449
+ 04DC           ;  
+ 04DC           ;  DDRH=0XFF;
+ 04DC 80930101          sts 257,R24
+ 04E0                   .dbline 450
+ 04E0           ;  PORTH=0X00;
+ 04E0 20920201          sts 258,R2
+ 04E4                   .dbline 453
+ 04E4           ; 
+ 04E4           ;  //watchdog_init();
+ 04E4           ;  PORTL=0X00;
+ 04E4 20920B01          sts 267,R2
+ 04E8                   .dbline 454
+ 04E8           ;  DDRL=0X3F;     //PL0,1输入，其他输出
+ 04E8 8FE3              ldi R24,63
+ 04EA 80930A01          sts 266,R24
+ 04EE                   .dbline 456
+ 04EE           ;  
+ 04EE           ;  PORTK=0X00;
+ 04EE 20920801          sts 264,R2
+ 04F2                   .dbline 457
+ 04F2           ;  DDRK=0X00;
+ 04F2 20920701          sts 263,R2
+ 04F6                   .dbline 461
+ 04F6           ;  
+ 04F6           ;  //timer1_init();  //停止状态机
+ 04F6           ;  
+ 04F6           ;  USART0_Init(MYUBRR);
+ 04F6 07E4              ldi R16,71
+ 04F8 10E0              ldi R17,0
+ 04FA 64DE              xcall _USART0_Init
+ 04FC                   .dbline 462
+ 04FC           ;  USART1_Init(MYUBRR);
+ 04FC 07E4              ldi R16,71
+ 04FE 10E0              ldi R17,0
+ 0500 76DE              xcall _USART1_Init
+ 0502                   .dbline 464
+ 0502           ;  //MCUCR = 0x00;
+ 0502           ;  timer1_init();
+ 0502 8ADF              xcall _timer1_init
+ 0504                   .dbline 465
+ 0504           ;  timer3_init();
+ 0504 A2DF              xcall _timer3_init
+ 0506                   .dbline 466
+ 0506           ;  timer4_init();
+ 0506 BADF              xcall _timer4_init
+ 0508                   .dbline 467
+ 0508           ;  timer5_init();
+ 0508 D4DF              xcall _timer5_init
+ 050A                   .dbline 470
+ 050A           ;  
+ 050A           ;  
+ 050A           ;   Position1=0;
+ 050A 80E0              ldi R24,0
+ 050C 80932E00          sts _Position1+0,R24
+ 0510 80932F00          sts _Position1+1,R24
+ 0514 80933000          sts _Position1+2,R24
+ 0518 80933100          sts _Position1+3,R24
+ 051C                   .dbline 473
+ 051C           ; 
+ 051C           ; 
+ 051C           ;  Position2=0;
+ 051C 80E0              ldi R24,0
+ 051E 80932800          sts _Position2+0,R24
+ 0522 80932900          sts _Position2+1,R24
+ 0526 80932A00          sts _Position2+2,R24
+ 052A 80932B00          sts _Position2+3,R24
+ 052E                   .dbline 476
+ 052E           ; 
+ 052E           ; 
+ 052E           ;  Position3=0;
+ 052E 80E0              ldi R24,0
+ 0530 80932200          sts _Position3+0,R24
+ 0534 80932300          sts _Position3+1,R24
+ 0538 80932400          sts _Position3+2,R24
+ 053C 80932500          sts _Position3+3,R24
+ 0540                   .dbline 478
+ 0540           ;  
+ 0540           ;  Position4=0;
+ 0540 80E0              ldi R24,0
+ 0542 80931C00          sts _Position4+0,R24
+ 0546 80931D00          sts _Position4+1,R24
+ 054A 80931E00          sts _Position4+2,R24
+ 054E 80931F00          sts _Position4+3,R24
+ 0552                   .dbline 481
+ 0552           ; 
+ 0552           ; 
+ 0552           ;  Position5=0;
+ 0552 80E0              ldi R24,0
+ 0554 80931600          sts _Position5+0,R24
+ 0558 80931700          sts _Position5+1,R24
+ 055C 80931800          sts _Position5+2,R24
+ 0560 80931900          sts _Position5+3,R24
+ 0564                   .dbline 484
+ 0564           ; 
+ 0564           ; 
+ 0564           ;  motor1Step=0;
+ 0564 80E0              ldi R24,0
+ 0566 80931000          sts _motor1Step+0,R24
+ 056A 80931100          sts _motor1Step+1,R24
+ 056E 80931200          sts _motor1Step+2,R24
+ 0572 80931300          sts _motor1Step+3,R24
+ 0576                   .dbline 485
+ 0576           ;  motor2Step=0;
+ 0576 80E0              ldi R24,0
+ 0578 80930C00          sts _motor2Step+0,R24
+ 057C 80930D00          sts _motor2Step+1,R24
+ 0580 80930E00          sts _motor2Step+2,R24
+ 0584 80930F00          sts _motor2Step+3,R24
+ 0588                   .dbline 486
+ 0588           ;  motor3Step=0;
+ 0588 80E0              ldi R24,0
+ 058A 80930800          sts _motor3Step+0,R24
+ 058E 80930900          sts _motor3Step+1,R24
+ 0592 80930A00          sts _motor3Step+2,R24
+ 0596 80930B00          sts _motor3Step+3,R24
+ 059A                   .dbline 487
+ 059A           ;  motor4Step=0;
+ 059A 80E0              ldi R24,0
+ 059C 80930400          sts _motor4Step+0,R24
+ 05A0 80930500          sts _motor4Step+1,R24
+ 05A4 80930600          sts _motor4Step+2,R24
+ 05A8 80930700          sts _motor4Step+3,R24
+ 05AC                   .dbline 488
+ 05AC           ;  motor5Step=0;
+ 05AC 80E0              ldi R24,0
+ 05AE 80930000          sts _motor5Step+0,R24
+ 05B2 80930100          sts _motor5Step+1,R24
+ 05B6 80930200          sts _motor5Step+2,R24
+ 05BA 80930300          sts _motor5Step+3,R24
+ 05BE                   .dbline 489
+ 05BE           ; SEI(); //re-enable interrupts
+ 05BE 7894              sei
+ 05C0                   .dbline -2
+ 05C0           L63:
+ 05C0                   .dbline 0 ; func end
+ 05C0 0895              ret
+ 05C2                   .dbend
+ 05C2                   .dbfunc e delayms _delayms fV
+ 05C2           ;              i -> y+4
+ 05C2           ;              j -> y+0
+ 05C2           ;              n -> y+8
+                        .even
+ 05C2           _delayms::
+ 05C2 1A93              st -y,r17
+ 05C4 0A93              st -y,r16
+ 05C6 2897              sbiw R28,8
+ 05C8                   .dbline -1
+ 05C8                   .dbline 496
+ 05C8           ;  //all peripherals are now initialized
+ 05C8           ; 
+ 05C8           ; 
+ 05C8           ; }
+ 05C8           ; 
+ 05C8           ; void  delayms(volatile unsigned int n)       
+ 05C8           ; { long i;
+ 05C8                   .dbline 498
+ 05C8           ;   long j;
+ 05C8           ;   for(i=0;i<100;i++)
+ 05C8 80E0              ldi R24,0
+ 05CA 8C83              std y+4+0,R24
+ 05CC 8D83              std y+4+1,R24
+ 05CE 8E83              std y+4+2,R24
+ 05D0 8F83              std y+4+3,R24
+ 05D2           L65:
+ 05D2                   .dbline 499
+ 05D2           ;   {
+ 05D2                   .dbline 500
+ 05D2           ;         for(j=n;j>0;j--)
+ 05D2 2884              ldd R2,y+8
+ 05D4 3984              ldd R3,y+9
+ 05D6 4424              clr R4
+ 05D8 5524              clr R5
+ 05DA 2882              std y+0,R2
+ 05DC 3982              std y+1,R3
+ 05DE 4A82              std y+2,R4
+ 05E0 5B82              std y+3,R5
+ 05E2 10C0              xjmp L72
+ 05E4           L69:
+ 05E4                   .dbline 501
+ 05E4           ;         {}
+ 05E4                   .dbline 501
+ 05E4           L70:
+ 05E4                   .dbline 500
+ 05E4 81E0              ldi R24,1
+ 05E6 90E0              ldi R25,0
+ 05E8 A0E0              ldi R26,0
+ 05EA B0E0              ldi R27,0
+ 05EC 2880              ldd R2,y+0
+ 05EE 3980              ldd R3,y+1
+ 05F0 4A80              ldd R4,y+2
+ 05F2 5B80              ldd R5,y+3
+ 05F4 281A              sub R2,R24
+ 05F6 390A              sbc R3,R25
+ 05F8 4A0A              sbc R4,R26
+ 05FA 5B0A              sbc R5,R27
+ 05FC 2882              std y+0,R2
+ 05FE 3982              std y+1,R3
+ 0600 4A82              std y+2,R4
+ 0602 5B82              std y+3,R5
+ 0604           L72:
+ 0604                   .dbline 500
+ 0604 80E0              ldi R24,0
+ 0606 90E0              ldi R25,0
+ 0608 A0E0              ldi R26,0
+ 060A B0E0              ldi R27,0
+ 060C 2880              ldd R2,y+0
+ 060E 3980              ldd R3,y+1
+ 0610 4A80              ldd R4,y+2
+ 0612 5B80              ldd R5,y+3
+ 0614 8215              cp R24,R2
+ 0616 9305              cpc R25,R3
+ 0618 A405              cpc R26,R4
+ 061A B505              cpc R27,R5
+ 061C 1CF3              brlt L69
+ 061E           X14:
+ 061E                   .dbline 502
+ 061E           ;       } 
+ 061E           L66:
+ 061E                   .dbline 498
+ 061E 81E0              ldi R24,1
+ 0620 90E0              ldi R25,0
+ 0622 A0E0              ldi R26,0
+ 0624 B0E0              ldi R27,0
+ 0626 2C80              ldd R2,y+4
+ 0628 3D80              ldd R3,y+5
+ 062A 4E80              ldd R4,y+6
+ 062C 5F80              ldd R5,y+7
+ 062E 280E              add R2,R24
+ 0630 391E              adc R3,R25
+ 0632 4A1E              adc R4,R26
+ 0634 5B1E              adc R5,R27
+ 0636 2C82              std y+4,R2
+ 0638 3D82              std y+5,R3
+ 063A 4E82              std y+6,R4
+ 063C 5F82              std y+7,R5
+ 063E                   .dbline 498
+ 063E 84E6              ldi R24,100
+ 0640 90E0              ldi R25,0
+ 0642 A0E0              ldi R26,0
+ 0644 B0E0              ldi R27,0
+ 0646 2C80              ldd R2,y+4
+ 0648 3D80              ldd R3,y+5
+ 064A 4E80              ldd R4,y+6
+ 064C 5F80              ldd R5,y+7
+ 064E 2816              cp R2,R24
+ 0650 3906              cpc R3,R25
+ 0652 4A06              cpc R4,R26
+ 0654 5B06              cpc R5,R27
+ 0656 0CF4              brge X16
+ 0658 BCCF              xjmp L65
+ 065A           X16:
+ 065A           X15:
+ 065A                   .dbline -2
+ 065A           L64:
+ 065A                   .dbline 0 ; func end
+ 065A 2A96              adiw R28,10
+ 065C 0895              ret
+ 065E                   .dbsym l i 4 L
+ 065E                   .dbsym l j 0 L
+ 065E                   .dbsym l n 8 i
+ 065E                   .dbend
+ 065E                   .dbfunc e main _main fV
+                        .even
+ 065E           _main::
+ 065E                   .dbline -1
+ 065E                   .dbline 506
+ 065E           ;  
+ 065E           ; } 
+ 065E           ; void main()
+ 065E           ; {
+ 065E                   .dbline 508
+ 065E           ;  
+ 065E           ;       init_device();
+ 065E 35DF              xcall _init_device
+ 0660 19C0              xjmp L75
+ 0662           L74:
+ 0662                   .dbline 513
+ 0662           ;       
+ 0662           ;       
+ 0662           ;       
+ 0662           ;       while(1)
+ 0662           ;       {motor1_start(MOTOR_FORWARD);
+ 0662                   .dbline 513
+ 0662 01E0              ldi R16,1
+ 0664 10E0              ldi R17,0
+ 0666 D8DD              xcall _motor1_start
+ 0668                   .dbline 514
+ 0668           ;       motor3_start(MOTOR_FORWARD);
+ 0668 01E0              ldi R16,1
+ 066A 10E0              ldi R17,0
+ 066C 3FDE              xcall _motor3_start
+ 066E                   .dbline 515
+ 066E           ;       motor4_start(MOTOR_FORWARD);
+ 066E 01E0              ldi R16,1
+ 0670 10E0              ldi R17,0
+ 0672 71DE              xcall _motor4_start
+ 0674                   .dbline 516
+ 0674           ;       motor5_start(MOTOR_FORWARD);
+ 0674 01E0              ldi R16,1
+ 0676 10E0              ldi R17,0
+ 0678 8FDE              xcall _motor5_start
+ 067A                   .dbline 517
+ 067A           ;       PORTB=0b00000111;
+ 067A 87E0              ldi R24,7
+ 067C 85B9              out 0x5,R24
+ 067E                   .dbline 518
+ 067E           ;       delayms(1000);
+ 067E 08EE              ldi R16,1000
+ 0680 13E0              ldi R17,3
+ 0682 9FDF              xcall _delayms
+ 0684                   .dbline 519
+ 0684           ;     USART0_Transmit( 'A' );
+ 0684 01E4              ldi R16,65
+ 0686 ACDD              xcall _USART0_Transmit
+ 0688                   .dbline 520
+ 0688           ;        USART1_Transmit( 'A' );
+ 0688 01E4              ldi R16,65
+ 068A BFDD              xcall _USART1_Transmit
+ 068C                   .dbline 521
+ 068C           ;        motor1_stop();
+ 068C E8DD              xcall _motor1_stop
+ 068E                   .dbline 522
+ 068E           ;        motor3_stop();
+ 068E 51DE              xcall _motor3_stop
+ 0690                   .dbline 523
+ 0690           ;        motor4_stop();
+ 0690 79DE              xcall _motor4_stop
+ 0692                   .dbline 524
+ 0692           ;        motor5_stop();
+ 0692 99DE              xcall _motor5_stop
+ 0694                   .dbline 525
+ 0694           ;       }
+ 0694           L75:
+ 0694                   .dbline 512
+ 0694 E6CF              xjmp L74
+ 0696           X17:
+ 0696                   .dbline -2
+ 0696           L73:
+ 0696                   .dbline 0 ; func end
+ 0696 0895              ret
+ 0698                   .dbend
+                        .area bss(ram, con, rel)
+ 0000                   .dbfile E:\工作\atmage640\motor.c
+ 0000           _motor5Step::
+ 0000                   .blkb 4
+ 0004                   .dbsym e motor5Step _motor5Step L
+ 0004           _motor4Step::
+ 0004                   .blkb 4
+ 0008                   .dbsym e motor4Step _motor4Step L
+ 0008           _motor3Step::
+ 0008                   .blkb 4
+ 000C                   .dbsym e motor3Step _motor3Step L
+ 000C           _motor2Step::
+ 000C                   .blkb 4
+ 0010                   .dbsym e motor2Step _motor2Step L
+ 0010           _motor1Step::
+ 0010                   .blkb 4
+ 0014                   .dbsym e motor1Step _motor1Step L
+ 0014           _Direct5::
+ 0014                   .blkb 2
+ 0016                   .dbsym e Direct5 _Direct5 I
+ 0016           _Position5::
+ 0016                   .blkb 4
+ 001A                   .dbsym e Position5 _Position5 L
+ 001A           _Direct4::
+ 001A                   .blkb 2
+ 001C                   .dbsym e Direct4 _Direct4 I
+ 001C           _Position4::
+ 001C                   .blkb 4
+ 0020                   .dbsym e Position4 _Position4 L
+ 0020           _Direct3::
+ 0020                   .blkb 2
+ 0022                   .dbsym e Direct3 _Direct3 I
+ 0022           _Position3::
+ 0022                   .blkb 4
+ 0026                   .dbsym e Position3 _Position3 L
+ 0026           _Direct2::
+ 0026                   .blkb 2
+ 0028                   .dbsym e Direct2 _Direct2 I
+ 0028           _Position2::
+ 0028                   .blkb 4
+ 002C                   .dbsym e Position2 _Position2 L
+ 002C           _Direct1::
+ 002C                   .blkb 2
+ 002E                   .dbsym e Direct1 _Direct1 I
+ 002E           _Position1::
+ 002E                   .blkb 4
+ 0032                   .dbsym e Position1 _Position1 L
+ 0032           ; }

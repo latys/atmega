@@ -114,6 +114,10 @@ LED:
 
 								示例：字符串形式“1111000\r” 表示1号前进1000步
 									  16进制0x31 31 31 31 30 30 30 0D
+									  
+									  
+					增加设置速度命令：
+					           五个字节，0x0d结尾，前四位为速度，0-1024.如0256\r.
 
 
 
@@ -240,6 +244,7 @@ unsigned char global_yon_motor5_running;
 unsigned char global_yon_motor6_running;
 
 int global_pwm;
+int global_pwm_c=255;               //电脑上位机控制
 
 
 
@@ -398,12 +403,23 @@ ISR(USART1_RX_vect)
 ISR(USART0_RX_vect)
     {
     unsigned char temp;
+	unsigned char pwm[5];
 
 	temp=UDR0;
 	UART0_RECV_BUFFER[UART0_RECV_INDEX]=temp;
 	if(temp==0x0D)
 	{
-		UART0_RECV_FLAG=1;
+		if(UART0_RECV_INDEX>=10)
+		{
+			UART0_RECV_FLAG=1;
+		
+		}
+		else
+		{
+			memcpy(pwm,UART0_RECV_BUFFER,4);
+			global_pwm_c=atoi(pwm);
+		
+		}
 		UART0_RECV_INDEX=0;
 	}
 	else
@@ -466,8 +482,8 @@ void motor1_start(char direct)
 
 	motor1Step=0;
 	
-	OCR1AH=3;
-	OCR1AL=255;
+	OCR1AH=global_pwm_c>>8;
+	OCR1AL=global_pwm_c&0xff;
 	//OCR1A = PULSE_WIDTH;
 	DDRL |=(1<<2)|(1<<3) ;
 	
@@ -522,8 +538,8 @@ void motor2_start(char direct){
 
 
 	motor2Step=0;
-	OCR1BH=3;
-	OCR1BL=255;
+	OCR1BH=global_pwm_c>>8;
+	OCR1BL=global_pwm_c&0xff;
 	//OCR1B = PULSE_WIDTH;
 	DDRL |=(1<<4)|(1<<5) ;
 	//设置方向
@@ -578,8 +594,8 @@ void motor3_start(char direct){
 	//OCR3A = PULSE_WIDTH;
 	DDRL |=(1<<6)|(1<<7) ;
 
-		OCR3AH=0;
-	OCR3AL=64;
+		OCR3AH=global_pwm_c>>8;
+	OCR3AL=global_pwm_c&0xff;
 
 		PORTL |=(1<<6);     //enable
 
@@ -638,8 +654,8 @@ void motor3_speed(int pwm)
 void motor4_start(char direct){
 
 	motor4Step=0;
-	OCR3BH=3;
-	OCR3BL=255;
+	OCR3BH=global_pwm_c>>8;
+	OCR3BL=global_pwm_c&0xff;
 	//OCR3B = PULSE_WIDTH;
 	DDRD |=(1<<0)|(1<<1) ;
 	//设置方向
@@ -693,8 +709,8 @@ void motor5_start(char direct){
 
 	motor5Step=0;
 	
-	OCR4AH=3;
-	OCR4AL=255;
+	OCR4AH=global_pwm_c>>8;
+	OCR4AL=global_pwm_c&0xff;
 	//OCR4A = PULSE_WIDTH;
 	DDRD |=(1<<6)|(1<<7) ;
 	//设置方向
@@ -749,8 +765,8 @@ void motor6_start(char direct){
 
 	motor6Step=0;
 	
-	OCR4BH=3;
-	OCR4BL=255;
+	OCR4BH=global_pwm_c>>8;
+	OCR4BL=0xff;
 	//OCR4B = PULSE_WIDTH;
 	DDRB |=(1<<3)|(1<<4) ;
 	//设置方向
@@ -1368,12 +1384,12 @@ void fork_jiance()
 	
 	}
 
-	if(((PINK&0x40)==0&&Motor5Status==MOTOR_FORWARD)||((PINK&0x80)==0&&Motor5Status==MOTOR_BACKWARD))
+/*	if(((PINK&0x40)==0&&Motor5Status==MOTOR_FORWARD)||((PINK&0x80)==0&&Motor5Status==MOTOR_BACKWARD))
 	{
 		motor4_stop();
         global_yon_motor4_running=FALSE;
 		motor4Step=0;
-	}
+	}*/
 	
 
 }

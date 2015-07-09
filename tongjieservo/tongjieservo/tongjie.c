@@ -117,7 +117,7 @@ LED:
 									  
 									  
 					增加设置速度命令：
-					           五个字节，0x0d结尾，前四位为速度，0-1024.如0256\r.
+					           五个字节，0x0d结尾，前四位为速度，0-1023.如0256\r.
 
 
 
@@ -244,7 +244,7 @@ unsigned char global_yon_motor5_running;
 unsigned char global_yon_motor6_running;
 
 int global_pwm;
-int global_pwm_c=255;               //电脑上位机控制
+long global_pwm_c=255;               //电脑上位机控制
 
 
 
@@ -417,7 +417,11 @@ ISR(USART0_RX_vect)
 		else
 		{
 			memcpy(pwm,UART0_RECV_BUFFER,4);
-			global_pwm_c=atoi(pwm);
+			global_pwm_c=atol(pwm);
+			
+			if(global_pwm_c>1023)
+				global_pwm_c=1023;
+		//global_pwm_c=1023;
 		
 		}
 		UART0_RECV_INDEX=0;
@@ -669,7 +673,7 @@ void motor4_start(char direct){
 		
 	TCCR3A|=1<<5;
 
-	PORTB &=0xFE<<1;
+	PORTB &=~(0x01<<1);
 	
 
 	
